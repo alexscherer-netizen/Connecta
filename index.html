@@ -553,17 +553,34 @@ async function sendMessage() {
 }
 
 // Modal
-function openModal() { document.getElementById("modal-overlay").classList.add("visible"); document.getElementById("user-search").value=""; loadUsersForModal(); setTimeout(()=>document.getElementById("user-search").focus(),300); }
+function openModal() {
+  if (!session) { alert("Bitte erst einloggen."); return; }
+  document.getElementById("modal-overlay").classList.add("visible");
+  document.getElementById("user-search").value = "";
+  loadUsersForModal();
+  setTimeout(() => document.getElementById("user-search").focus(), 300);
+}
 function closeModalDirect() { document.getElementById("modal-overlay").classList.remove("visible"); }
 function closeModal(e) { if (e.target===document.getElementById("modal-overlay")) closeModalDirect(); }
 async function loadUsersForModal() {
   const list = document.getElementById("user-list");
   list.innerHTML = '<div class="empty-state">Lade Benutzer...</div>';
   if (!session) { list.innerHTML = '<div class="empty-state">Nicht eingeloggt</div>'; return; }
-  const { data, error } = await sb.from("profiles").select("*").neq("id", session.user.id);
-  if (error) { list.innerHTML = '<div class="empty-state">Fehler: ' + error.message + '</div>'; return; }
-  allUsers = data || [];
-  renderUserList(allUsers);
+  try {
+    const result = await Promise.race([
+      sb.from("profiles").select("*").neq("id", session.user.id),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+    ]);
+    if (result.error) throw result.error;
+    allUsers = result.data || [];
+    if (allUsers.length === 0) {
+      list.innerHTML = '<div class="empty-state">Keine anderen Benutzer gefunden</div>';
+    } else {
+      renderUserList(allUsers);
+    }
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state">Fehler: ' + e.message + '</div>';
+  }
 }
 function filterUsers() { const q=document.getElementById("user-search").value.toLowerCase(); renderUserList(allUsers.filter(u=>u.display_name.toLowerCase().includes(q)||u.username.toLowerCase().includes(q))); }
 function renderUserList(users) {
