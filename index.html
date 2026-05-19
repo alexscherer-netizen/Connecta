@@ -556,7 +556,15 @@ async function sendMessage() {
 function openModal() { document.getElementById("modal-overlay").classList.add("visible"); document.getElementById("user-search").value=""; loadUsersForModal(); setTimeout(()=>document.getElementById("user-search").focus(),300); }
 function closeModalDirect() { document.getElementById("modal-overlay").classList.remove("visible"); }
 function closeModal(e) { if (e.target===document.getElementById("modal-overlay")) closeModalDirect(); }
-async function loadUsersForModal() { const { data }=await sb.from("profiles").select("*").neq("id",session.user.id); allUsers=data||[]; renderUserList(allUsers); }
+async function loadUsersForModal() {
+  const list = document.getElementById("user-list");
+  list.innerHTML = '<div class="empty-state">Lade Benutzer...</div>';
+  if (!session) { list.innerHTML = '<div class="empty-state">Nicht eingeloggt</div>'; return; }
+  const { data, error } = await sb.from("profiles").select("*").neq("id", session.user.id);
+  if (error) { list.innerHTML = '<div class="empty-state">Fehler: ' + error.message + '</div>'; return; }
+  allUsers = data || [];
+  renderUserList(allUsers);
+}
 function filterUsers() { const q=document.getElementById("user-search").value.toLowerCase(); renderUserList(allUsers.filter(u=>u.display_name.toLowerCase().includes(q)||u.username.toLowerCase().includes(q))); }
 function renderUserList(users) {
   const list=document.getElementById("user-list");
