@@ -91,7 +91,7 @@ input,textarea{font-family:inherit}
 .send-btn:active{transform:scale(.92)}
 
 /* Modal */
-#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:flex-end;justify-content:center;z-index:300;backdrop-filter:blur(2px)}
+#modal-overlay,#profile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:flex-end;justify-content:center;z-index:300;backdrop-filter:blur(2px)}
 #modal-overlay.visible{display:flex}
 .modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:82dvh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.2);animation:slideUp .28s cubic-bezier(.4,0,.2,1)}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -160,7 +160,7 @@ input,textarea{font-family:inherit}
 <div id="app">
   <div id="sidebar">
     <div class="sidebar-header">
-      <div class="avatar" id="my-avatar" style="width:40px;height:40px;font-size:15px"></div>
+      <div class="avatar" id="my-avatar" style="width:40px;height:40px;font-size:15px;cursor:pointer" onclick="openProfileModal()" title="Profil bearbeiten"></div>
       <span class="my-name" id="my-name"></span>
       <button class="icon-btn" onclick="openModal()">✏️</button>
       <button class="icon-btn" onclick="signOut()">🚪</button>
@@ -193,6 +193,35 @@ input,textarea{font-family:inherit}
   </div>
 </div>
 
+<div id="profile-overlay" onclick="closeProfileModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <button class="icon-btn" onclick="closeProfileModal()" style="font-size:16px">✕</button>
+      <h3>Profil bearbeiten</h3>
+    </div>
+    <div style="padding:24px;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
+      <div style="display:flex;justify-content:center;margin-bottom:8px">
+        <div class="avatar" id="profile-preview" style="width:80px;height:80px;font-size:30px;cursor:default"></div>
+      </div>
+      <div>
+        <p class="color-label">Avatar-Farbe</p>
+        <div class="color-row" id="profile-color-row"></div>
+      </div>
+      <div>
+        <p class="color-label">Anzeigename</p>
+        <input class="auth-input" id="profile-displayname" placeholder="Anzeigename" autocomplete="off"/>
+      </div>
+      <div>
+        <p class="color-label">Status</p>
+        <input class="auth-input" id="profile-status" placeholder="Hey, I am using ChatApp!" autocomplete="off"/>
+      </div>
+      <p id="profile-msg" style="font-size:13px;text-align:center"></p>
+      <button class="auth-btn" id="profile-save-btn" onclick="saveProfile()" style="margin-top:0">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal-overlay" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -200,7 +229,7 @@ input,textarea{font-family:inherit}
       <button class="icon-btn" onclick="closeModalDirect()" style="font-size:16px">✕</button>
       <h3>Neuen Chat starten</h3>
     </div>
-    <div class="modal-search"><div class="modal-search-inner">🔍&nbsp;<input id="user-search" placeholder="Benutzer suchen…" oninput="filterUsers()" autocapitalize="none"/></div></div>
+    <div class="modal-search"><div class="modal-search-inner">🔍&nbsp;<input id="user-search" placeholder="E-Mail oder Benutzername eingeben…" oninput="filterUsers()" autocapitalize="none"/></div></div>
     <div id="user-list"></div>
   </div>
 </div>
@@ -446,18 +475,34 @@ function closeModalDirect() { document.getElementById("modal-overlay").classList
 function closeModal(e) { if(e.target===document.getElementById("modal-overlay"))closeModalDirect(); }
 
 async function loadUsersForModal() {
-  const list=document.getElementById("user-list");
-  list.innerHTML='<div class="empty-state">Lade Benutzer...</div>';
-  try {
-    const users = await api("/rest/v1/profiles?id=neq."+session.user.id+"&select=*");
-    allUsers=users||[];
-    allUsers.length ? renderUserList(allUsers) : list.innerHTML='<div class="empty-state">Keine anderen Benutzer gefunden</div>';
-  } catch(e) { list.innerHTML='<div class="empty-state">Fehler: '+e.message+'</div>'; }
+  const list = document.getElementById("user-list");
+  list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Gib eine E-Mail-Adresse oder einen<br>Benutzernamen ein, um zu suchen.</div>';
 }
 
-function filterUsers() {
-  const q=document.getElementById("user-search").value.toLowerCase();
-  renderUserList(allUsers.filter(u=>u.display_name.toLowerCase().includes(q)||u.username.toLowerCase().includes(q)));
+async function filterUsers() {
+  const q = document.getElementById("user-search").value.trim();
+  const list = document.getElementById("user-list");
+  if (q.length < 2) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Gib eine E-Mail-Adresse oder einen<br>Benutzernamen ein, um zu suchen.</div>';
+    return;
+  }
+  list.innerHTML = '<div class="empty-state">Suche...</div>';
+  try {
+    // Search by username OR email (exact or partial match)
+    const byUsername = await api("/rest/v1/profiles?username=ilike.*"+encodeURIComponent(q)+"*&id=neq."+session.user.id+"&select=*");
+    // Also search by email via auth - join on profiles
+    const byEmail = await api("/rest/v1/profiles?id=neq."+session.user.id+"&select=*&display_name=ilike.*"+encodeURIComponent(q)+"*");
+    // Merge and deduplicate
+    const combined = [...(byUsername||[]), ...(byEmail||[])];
+    const seen = new Set();
+    const users = combined.filter(u => { if (seen.has(u.id)) return false; seen.add(u.id); return true; });
+    allUsers = users;
+    if (!users.length) {
+      list.innerHTML = '<div class="empty-state">Kein Nutzer gefunden.<br><small>Prüfe die Eingabe und versuche es erneut.</small></div>';
+    } else {
+      renderUserList(users);
+    }
+  } catch(e) { list.innerHTML = '<div class="empty-state">Fehler: ' + e.message + '</div>'; }
 }
 
 function renderUserList(users) {
@@ -486,6 +531,81 @@ async function startConversation(user) {
     const newConv = conversations.find(c=>c.id===convId) || {id:convId, otherProfile:user, lastMsg:null};
     openConversation({...newConv, otherProfile:user});
   } catch(e) { alert("Fehler beim Chat erstellen: "+e.message); }
+}
+
+// ── Profile color picker ──
+let profileColor = "#25D366";
+const profileColorRow = document.getElementById("profile-color-row");
+COLORS.forEach(c => {
+  const btn = document.createElement("button");
+  btn.className = "color-dot";
+  btn.style.background = c;
+  btn.onclick = () => {
+    profileColor = c;
+    profileColorRow.querySelectorAll(".color-dot").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    const prev = document.getElementById("profile-preview");
+    prev.style.background = c;
+  };
+  profileColorRow.appendChild(btn);
+});
+
+function openProfileModal() {
+  if (!myProfile) return;
+  profileColor = myProfile.avatar_color || "#25D366";
+  document.getElementById("profile-displayname").value = myProfile.display_name || "";
+  document.getElementById("profile-status").value = myProfile.status || "";
+  document.getElementById("profile-msg").textContent = "";
+  // Set avatar preview
+  const prev = document.getElementById("profile-preview");
+  prev.style.background = profileColor;
+  prev.textContent = getInitials(myProfile.display_name);
+  // Highlight selected color
+  profileColorRow.querySelectorAll(".color-dot").forEach(b => {
+    b.classList.toggle("selected", b.style.background === profileColor || rgbToHex(b.style.background) === profileColor);
+  });
+  document.getElementById("profile-overlay").classList.add("visible");
+}
+
+function rgbToHex(rgb) {
+  const m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (!m) return rgb;
+  return "#" + [m[1],m[2],m[3]].map(x=>parseInt(x).toString(16).padStart(2,"0")).join("");
+}
+
+function closeProfileModal(e) {
+  if (e && e.target !== document.getElementById("profile-overlay")) return;
+  document.getElementById("profile-overlay").classList.remove("visible");
+}
+
+async function saveProfile() {
+  const displayName = document.getElementById("profile-displayname").value.trim();
+  const status = document.getElementById("profile-status").value.trim();
+  const msg = document.getElementById("profile-msg");
+  const btn = document.getElementById("profile-save-btn");
+  if (!displayName) { msg.style.color="#e53935"; msg.textContent="Anzeigename darf nicht leer sein."; return; }
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/profiles?id=eq." + session.user.id, {
+      method: "PATCH",
+      headers: { ...HJ(), "Prefer": "return=representation" },
+      body: JSON.stringify({ display_name: displayName, avatar_color: profileColor, status: status })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    myProfile = updated?.[0] || { ...myProfile, display_name: displayName, avatar_color: profileColor, status };
+    // Update sidebar avatar + name
+    makeAvatar(document.getElementById("my-avatar"), myProfile, 40);
+    document.getElementById("my-name").textContent = myProfile.display_name;
+    // Update chat header if chatting with someone
+    msg.style.color = "#128C7E";
+    msg.textContent = "Profil gespeichert!";
+    setTimeout(() => document.getElementById("profile-overlay").classList.remove("visible"), 1000);
+  } catch(e) {
+    msg.style.color = "#e53935";
+    msg.textContent = "Fehler: " + e.message;
+  }
+  btn.disabled = false; btn.textContent = "Speichern";
 }
 </script>
 </body>
