@@ -350,7 +350,13 @@ input, textarea { font-family: inherit; }
 <script>
 const SUPABASE_URL = "https://ugitunttmvswyxmyhnjb.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnaXR1bnR0bXZzd3l4bXlobmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjczNTksImV4cCI6MjA5NDYwMzM1OX0.aL_253uFlWL0CWpIF0Muz7ay7USKiHyCn2rCj7fIdiM";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
 
 const COLORS = ["#25D366","#128C7E","#075E54","#34B7F1","#00BCD4","#9C27B0","#E91E63","#FF5722","#FF9800","#4CAF50"];
 let selectedColor = COLORS[0];
@@ -567,12 +573,19 @@ async function loadUsersForModal() {
   list.innerHTML = '<div class="empty-state">Lade Benutzer...</div>';
   if (!session) { list.innerHTML = '<div class="empty-state">Nicht eingeloggt</div>'; return; }
   try {
-    const result = await Promise.race([
-      sb.from("profiles").select("*").neq("id", session.user.id),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
-    ]);
-    if (result.error) throw result.error;
-    allUsers = result.data || [];
+    const token = session.access_token;
+    const res = await fetch(
+      SUPABASE_URL + "/rest/v1/profiles?id=neq." + session.user.id + "&select=*",
+      {
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    if (!res.ok) throw new Error("HTTP " + res.status + ": " + await res.text());
+    allUsers = await res.json();
     if (allUsers.length === 0) {
       list.innerHTML = '<div class="empty-state">Keine anderen Benutzer gefunden</div>';
     } else {
