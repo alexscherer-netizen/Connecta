@@ -92,7 +92,7 @@ input,textarea{font-family:inherit}
 
 /* Modal */
 #modal-overlay,#profile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:flex-end;justify-content:center;z-index:300;backdrop-filter:blur(2px)}
-#modal-overlay.visible{display:flex}
+#modal-overlay.visible,#profile-overlay.visible{display:flex}
 .modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:82dvh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.2);animation:slideUp .28s cubic-bezier(.4,0,.2,1)}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .modal-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:10px auto 4px;flex-shrink:0}
@@ -197,7 +197,7 @@ input,textarea{font-family:inherit}
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <button class="icon-btn" onclick="closeProfileModal()" style="font-size:16px">✕</button>
+      <button class="icon-btn" onclick="closeProfileModalDirect()" style="font-size:16px">✕</button>
       <h3>Profil bearbeiten</h3>
     </div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
@@ -332,7 +332,7 @@ async function handleAuth() {
 }
 
 // ── Auth state ──
-sb.auth.onAuthStateChange(async (event, sess) => {
+async function initSession(sess) {
   session = sess;
   if (sess) {
     document.getElementById("auth-screen").style.display="none";
@@ -351,6 +351,15 @@ sb.auth.onAuthStateChange(async (event, sess) => {
     document.getElementById("auth-btn").disabled=false;
     document.getElementById("auth-btn").textContent=currentMode==="login"?"Anmelden":"Konto erstellen";
   }
+}
+
+// Restore existing session on page load
+sb.auth.getSession().then(({ data }) => {
+  if (data?.session) initSession(data.session);
+});
+
+sb.auth.onAuthStateChange(async (event, sess) => {
+  initSession(sess);
 });
 
 async function signOut() { await sb.auth.signOut(); activeConv=null; conversations=[]; goBack(); renderConversations(); }
@@ -575,6 +584,9 @@ function rgbToHex(rgb) {
 
 function closeProfileModal(e) {
   if (e && e.target !== document.getElementById("profile-overlay")) return;
+  document.getElementById("profile-overlay").classList.remove("visible");
+}
+function closeProfileModalDirect() {
   document.getElementById("profile-overlay").classList.remove("visible");
 }
 
