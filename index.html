@@ -476,19 +476,31 @@ async function signOut() { await sb.auth.signOut(); activeConv=null; conversatio
 // Conversations
 async function loadConversations() {
   if (!session) return;
-  const { data: parts } = await sb.from("conversation_participants").select("conversation_id").eq("user_id", session.user.id);
-  if (!parts?.length) { renderConversations(); return; }
-  const ids = parts.map(p=>p.conversation_id);
-  const { data: convs } = await sb.from("conversations").select("*").in("id",ids).order("updated_at",{ascending:false});
-  conversations = await Promise.all((convs||[]).map(async conv => {
-    const { data: lastMsg } = await sb.from("messages").select("content,created_at,sender_id").eq("conversation_id",conv.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
-    const { data: participants } = await sb.from("conversation_participants").select("user_id").eq("conversation_id",conv.id);
-    const otherId = participants?.find(p=>p.user_id!==session.user.id)?.user_id;
-    let otherProfile = null;
-    if (otherId) { const { data } = await sb.from("profiles").select("*").eq("id",otherId).single(); otherProfile=data; }
-    return { ...conv, lastMsg, otherProfile };
-  }));
-  renderConversations();
+  const h = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + session.access_token };
+  try {
+    const partsRes = await fetch(SUPABASE_URL + "/rest/v1/conversation_participants?user_id=eq." + session.user.id + "&select=conversation_id", { headers: h });
+    const parts = await partsRes.json();
+    if (!parts?.length) { renderConversations(); return; }
+    const ids = parts.map(p => p.conversation_id).join(",");
+    const convsRes = await fetch(SUPABASE_URL + "/rest/v1/conversations?id=in.(" + ids + ")&order=updated_at.desc", { headers: h });
+    const convs = await convsRes.json();
+    conversations = await Promise.all((convs||[]).map(async conv => {
+      const lastMsgRes = await fetch(SUPABASE_URL + "/rest/v1/messages?conversation_id=eq." + conv.id + "&order=created_at.desc&limit=1&select=content,created_at,sender_id", { headers: h });
+      const lastMsgArr = await lastMsgRes.json();
+      const lastMsg = lastMsgArr?.[0] || null;
+      const partRes = await fetch(SUPABASE_URL + "/rest/v1/conversation_participants?conversation_id=eq." + conv.id + "&select=user_id", { headers: h });
+      const participants = await partRes.json();
+      const otherId = participants?.find(p => p.user_id !== session.user.id)?.user_id;
+      let otherProfile = null;
+      if (otherId) {
+        const profRes = await fetch(SUPABASE_URL + "/rest/v1/profiles?id=eq." + otherId + "&select=*", { headers: h });
+        const profArr = await profRes.json();
+        otherProfile = profArr?.[0] || null;
+      }
+      return { ...conv, lastMsg, otherProfile };
+    }));
+    renderConversations();
+  } catch(e) { console.error("loadConversations error:", e); }
 }
 
 function renderConversations() {
@@ -523,8 +535,12 @@ async function openConversation(conv) {
   document.getElementById("chat-welcome").style.display = "none";
   document.getElementById("chat-view").classList.add("visible");
   showChatOnMobile();
-  const { data } = await sb.from("messages").select("*").eq("conversation_id",conv.id).order("created_at",{ascending:true});
-  renderMessages(data||[]);
+  const h2 = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + session.access_token };
+  try {
+    const msgsRes = await fetch(SUPABASE_URL + "/rest/v1/messages?conversation_id=eq." + conv.id + "&order=created_at.asc&select=*", { headers: h2 });
+    const msgs = await msgsRes.json();
+    renderMessages(Array.isArray(msgs) ? msgs : []);
+  } catch(e) { renderMessages([]); }
   if (msgChannel) sb.removeChannel(msgChannel);
   msgChannel = sb.channel("msgs-"+conv.id)
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conv.id}`},
@@ -552,10 +568,22 @@ function appendMessage(msg, scroll=true) {
 }
 
 async function sendMessage() {
-  const content=msgInput.value.trim();
-  if (!content||!activeConv) return;
-  msgInput.value=""; msgInput.style.height="auto";
-  await sb.from("messages").insert({conversation_id:activeConv.id,sender_id:session.user.id,content});
+  const content = msgInput.value.trim();
+  if (!content || !activeConv) return;
+  msgInput.value = ""; msgInput.style.height = "auto";
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/messages", {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + session.access_token,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify({ conversation_id: activeConv.id, sender_id: session.user.id, content })
+    });
+    if (!res.ok) alert("Nachricht Fehler: " + await res.text());
+  } catch(e) { alert("Fehler: " + e.message); }
 }
 
 // Modal
@@ -608,12 +636,35 @@ function renderUserList(users) {
 }
 async function startConversation(user) {
   closeModalDirect();
-  const existing=conversations.find(c=>c.otherProfile?.id===user.id);
+  const existing = conversations.find(c => c.otherProfile?.id === user.id);
   if (existing) { openConversation(existing); return; }
-  const { data: conv }=await sb.from("conversations").insert({}).select().single();
-  await sb.from("conversation_participants").insert([{conversation_id:conv.id,user_id:session.user.id},{conversation_id:conv.id,user_id:user.id}]);
-  await loadConversations();
-  openConversation({...conv,otherProfile:user});
+  try {
+    const token = session.access_token;
+    const headers = {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation"
+    };
+    const convRes = await fetch(SUPABASE_URL + "/rest/v1/conversations", {
+      method: "POST", headers, body: JSON.stringify({})
+    });
+    if (!convRes.ok) throw new Error("Conversation: " + await convRes.text());
+    const convData = await convRes.json();
+    const conv = Array.isArray(convData) ? convData[0] : convData;
+    const partRes = await fetch(SUPABASE_URL + "/rest/v1/conversation_participants", {
+      method: "POST", headers,
+      body: JSON.stringify([
+        { conversation_id: conv.id, user_id: session.user.id },
+        { conversation_id: conv.id, user_id: user.id }
+      ])
+    });
+    if (!partRes.ok) throw new Error("Teilnehmer: " + await partRes.text());
+    await loadConversations();
+    openConversation({ ...conv, otherProfile: user });
+  } catch(e) {
+    alert("Fehler: " + e.message);
+  }
 }
 
 // Orientation/resize
