@@ -58,6 +58,14 @@ input,textarea{font-family:'DM Sans',sans-serif;font-size:16px!important}
 .btn-danger{width:100%;padding:13px;border-radius:12px;background:#FF4444;color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer;transition:opacity .2s}
 .btn-danger:disabled{opacity:.4;cursor:not-allowed}
 .btn-cancel{width:100%;padding:11px;border-radius:12px;background:var(--surface2);color:var(--sub);font-weight:500;font-size:14px;border:1px solid var(--border);cursor:pointer;margin-top:8px}
+.admin-user-card{padding:14px 16px;border-bottom:1px solid var(--border);transition:background .1s}
+.admin-user-card:hover{background:var(--surface2)}
+.admin-action-btn{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:none}
+.admin-action-btn.reset{background:rgba(0,200,255,0.1);color:var(--cyan);border:1px solid rgba(0,200,255,0.25)}
+.admin-action-btn.reset:hover{background:rgba(0,200,255,0.2)}
+.admin-action-btn.make-admin{background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.25)}
+.admin-action-btn.revoke-admin{background:rgba(255,68,68,0.1);color:#ff6b6b;border:1px solid rgba(255,68,68,0.25)}
+.admin-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'Space Mono',monospace;background:rgba(0,200,255,0.12);color:var(--cyan);border:1px solid rgba(0,200,255,0.2);margin-left:6px}
 
 /* Emoji picker */
 .emoji-btn{width:42px;height:42px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--sub);flex-shrink:0;border:1px solid var(--border);transition:all .15s}
@@ -488,6 +496,14 @@ body::before{
           <div><div class="settings-title">Abmelden</div><div class="settings-sub">Von diesem Gerät abmelden</div></div>
         </div>
       </div>
+      <div id="admin-settings-section" style="display:none;padding:0 16px 8px">
+        <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">// Admin</p>
+        <div class="settings-item" onclick="openAdminPanel()" style="background:rgba(0,200,255,0.04);border-radius:12px;border:1px solid rgba(0,200,255,0.15)">
+          <span class="settings-icon" style="background:rgba(0,200,255,0.1);border-color:rgba(0,200,255,0.2)">🛡️</span>
+          <div><div class="settings-title" style="color:var(--cyan)">Admin-Panel</div><div class="settings-sub">Nutzerverwaltung & Support</div></div>
+          <span style="color:var(--cyan);margin-left:auto">›</span>
+        </div>
+      </div>
       <div style="padding:0 16px 8px">
         <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">// Gefahrenzone</p>
         <div class="settings-item danger" onclick="confirmDeleteAccount()">
@@ -769,6 +785,7 @@ async function initSession(sess) {
     try { const p=await api("/rest/v1/profiles?id=eq."+sess.user.id+"&select=*"); myProfile=p?.[0]||null; } catch(e){}
     makeAvatar(document.getElementById("my-avatar"),myProfile,36);
     document.getElementById("my-name").textContent=myProfile?.display_name||sess.user.email||"";
+    checkAdminStatus();
     await loadConversations();
     await loadContacts();
     sb.channel("conv-rt").on("postgres_changes",{event:"*",schema:"public",table:"conversations"},loadConversations).subscribe();
@@ -1470,6 +1487,105 @@ async function markAsRead(convId) {
     if (conv) { conv.unread = 0; renderConversations(); }
   } catch(e) {}
 }
+
+// ── Admin Panel ──
+let allAdminUsers = [];
+
+async function checkAdminStatus() {
+  if (!myProfile) return;
+  if (myProfile.is_admin) {
+    document.getElementById("admin-settings-section").style.display = "block";
+  }
+}
+
+async function openAdminPanel() {
+  document.getElementById("admin-overlay").style.display = "flex";
+  document.getElementById("admin-user-list").innerHTML = '<div class="empty-state">Lade Nutzer…</div>';
+  document.getElementById("admin-search").value = "";
+  try {
+    const users = await api("/rest/v1/rpc/admin_get_all_users", { method:"POST", json:true, body:"{}" });
+    allAdminUsers = users || [];
+    document.getElementById("admin-user-count").textContent = allAdminUsers.length + " Nutzer";
+    renderAdminUsers(allAdminUsers);
+  } catch(e) {
+    document.getElementById("admin-user-list").innerHTML = '<div class="empty-state" style="color:#FF4444">Fehler: ' + e.message + '</div>';
+  }
+}
+
+function filterAdminUsers() {
+  const q = document.getElementById("admin-search").value.toLowerCase().trim();
+  if (!q) { renderAdminUsers(allAdminUsers); return; }
+  renderAdminUsers(allAdminUsers.filter(u =>
+    u.display_name?.toLowerCase().includes(q) ||
+    u.username?.toLowerCase().includes(q) ||
+    u.email?.toLowerCase().includes(q)
+  ));
+}
+
+function renderAdminUsers(users) {
+  const list = document.getElementById("admin-user-list");
+  if (!users.length) { list.innerHTML = '<div class="empty-state">Keine Nutzer gefunden</div>'; return; }
+  list.innerHTML = "";
+  users.forEach(u => {
+    const card = document.createElement("div");
+    card.className = "admin-user-card";
+    const joined = new Date(u.created_at).toLocaleDateString("de-DE", {day:"2-digit",month:"2-digit",year:"numeric"});
+    const lastSeen = u.last_seen ? new Date(u.last_seen).toLocaleDateString("de-DE", {day:"2-digit",month:"2-digit",year:"numeric"}) : "–";
+    const isMe = u.id === session?.user?.id;
+
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="avatar" style="width:44px;height:44px;font-size:16px;background:${u.avatar_color||"#00B8D9"};flex-shrink:0;overflow:hidden;position:relative">
+          ${u.avatar_url ? `<img src="${u.avatar_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:inherit"/>` : getInitials(u.display_name)}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+            <span style="font-weight:600;font-size:14px;color:var(--text)">${escHtml(u.display_name)}</span>
+            ${u.is_admin ? '<span class="admin-badge">ADMIN</span>' : ''}
+            ${isMe ? '<span style="font-size:10px;color:var(--sub2);font-family:Space Mono,monospace">(Du)</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:var(--sub);font-family:'Space Mono',monospace">@${escHtml(u.username)}</div>
+          <div style="font-size:11px;color:var(--sub2);margin-top:2px">${escHtml(u.email||"–")}</div>
+          <div style="font-size:11px;color:var(--sub2);font-family:'Space Mono',monospace;margin-top:2px">
+            Beigetreten: ${joined} · Zuletzt online: ${lastSeen}
+          </div>
+        </div>
+      </div>
+      ${!isMe ? `
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="admin-action-btn reset" onclick="adminResetPassword('${escHtml(u.email||"")}','${escHtml(u.display_name)}')">
+          🔑 PW zurücksetzen
+        </button>
+        <button class="admin-action-btn ${u.is_admin ? 'revoke-admin' : 'make-admin'}" 
+          onclick="adminToggleAdmin('${u.id}',${!u.is_admin},'${escHtml(u.display_name)}')">
+          ${u.is_admin ? '🛡️ Admin entziehen' : '🛡️ Zum Admin machen'}
+        </button>
+      </div>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+async function adminResetPassword(email, name) {
+  if (!email) { alert("Keine E-Mail für diesen Nutzer hinterlegt."); return; }
+  if (!confirm("Passwort-Reset-E-Mail an " + name + " (" + email + ") senden?")) return;
+  try {
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+    alert("✅ Reset-E-Mail wurde an " + email + " gesendet.");
+  } catch(e) { alert("Fehler: " + e.message); }
+}
+
+async function adminToggleAdmin(userId, makeAdmin, name) {
+  const action = makeAdmin ? "zum Admin machen" : "Admin-Rechte entziehen";
+  if (!confirm(name + " " + action + "?")) return;
+  try {
+    await api("/rest/v1/rpc/admin_toggle_admin", {
+      method:"POST", json:true,
+      body: JSON.stringify({ target_user_id: userId, new_status: makeAdmin })
+    });
+    await openAdminPanel(); // Refresh
+  } catch(e) { alert("Fehler: " + e.message); }
+}
 </script>
 <!-- EMOJI PICKER -->
 <div class="emoji-picker" id="emoji-picker">
@@ -1502,6 +1618,32 @@ async function markAsRead(convId) {
       <h3 id="legal-title" style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace;flex:1"></h3>
     </div>
     <div id="legal-content" style="overflow-y:auto;padding:24px;flex:1;font-size:14px;line-height:1.8;color:var(--text)"></div>
+  </div>
+</div>
+<!-- ADMIN PANEL -->
+<div id="admin-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;flex-direction:column;backdrop-filter:blur(8px)">
+  <div style="background:var(--surface);height:100%;max-width:700px;width:100%;margin:0 auto;display:flex;flex-direction:column;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+    <!-- Header -->
+    <div style="padding:calc(16px + var(--safe-top)) 20px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0">
+      <button onclick="document.getElementById('admin-overlay').style.display='none'" style="background:none;border:none;font-size:20px;color:var(--sub);cursor:pointer;padding:4px">✕</button>
+      <div>
+        <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:16px;color:var(--cyan)">🛡️ Admin-Panel</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:2px">Nutzerverwaltung & Support</div>
+      </div>
+      <div style="margin-left:auto">
+        <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2)" id="admin-user-count"></div>
+      </div>
+    </div>
+    <!-- Search -->
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="background:var(--surface2);border-radius:10px;padding:9px 14px;display:flex;align-items:center;gap:8px;border:1.5px solid var(--border)">
+        <span style="color:var(--sub2)">🔍</span>
+        <input id="admin-search" placeholder="Nutzer suchen…" oninput="filterAdminUsers()"
+          style="border:none;background:transparent;outline:none;font-size:14px;flex:1;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px"/>
+      </div>
+    </div>
+    <!-- User list -->
+    <div id="admin-user-list" style="flex:1;overflow-y:auto;padding:8px 0"></div>
   </div>
 </div>
 </body>
