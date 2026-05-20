@@ -66,6 +66,10 @@ input,textarea{font-family:'DM Sans',sans-serif;font-size:16px!important}
 .admin-action-btn.make-admin{background:rgba(124,58,237,0.1);color:#a78bfa;border:1px solid rgba(124,58,237,0.25)}
 .admin-action-btn.revoke-admin{background:rgba(255,68,68,0.1);color:#ff6b6b;border:1px solid rgba(255,68,68,0.25)}
 .admin-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'Space Mono',monospace;background:rgba(0,200,255,0.12);color:var(--cyan);border:1px solid rgba(0,200,255,0.2);margin-left:6px}
+.banned-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'Space Mono',monospace;background:rgba(255,68,68,.12);color:#ff4444;border:1px solid rgba(255,68,68,.2);margin-left:6px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px}
+.stat-value{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--cyan)}
+.stat-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
 
 /* Emoji picker */
 .emoji-btn{width:42px;height:42px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--sub);flex-shrink:0;border:1px solid var(--border);transition:all .15s}
@@ -322,6 +326,81 @@ body::before{
 /* Edit indicator */
 .msg-edited{font-size:10px;color:var(--sub2);font-style:italic;margin-left:4px}
 
+/* Search in chat */
+.chat-search-bar{display:none;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);align-items:center;gap:8px;flex-shrink:0}
+.chat-search-bar.visible{display:flex}
+.chat-search-bar input{flex:1;border:none;background:var(--surface2);outline:none;font-size:15px;color:var(--text);padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Sans',sans-serif}
+.chat-search-bar input:focus{border-color:var(--cyan2)}
+.search-nav-btn{background:none;border:none;font-size:18px;color:var(--sub);cursor:pointer;padding:4px 6px;border-radius:8px}
+.search-nav-btn:hover{background:var(--surface2);color:var(--text)}
+.msg-highlight{outline:2px solid rgba(255,200,0,0.8)!important;border-radius:6px}
+
+/* Theme toggle */
+.theme-btn{width:38px;height:38px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .15s;flex-shrink:0}
+.theme-btn:hover{background:rgba(0,200,255,.1);border-color:var(--cyan2)}
+
+/* Light mode */
+body.light{
+  --bg:#F0F4F8;--white:#FFFFFF;--surface:#FFFFFF;--surface2:#F7FAFC;
+  --border:#E2E8F0;--border2:#CBD5E0;--text:#1A202C;--sub:#718096;--sub2:#A0AEC0;
+}
+body.light .msg-bubble.me{background:linear-gradient(135deg,#d1f2ff,#e8f8ff);border-color:#b2e8f5}
+body.light .msg-bubble.me .msg-text{color:#1a202c}
+body.light .msg-bubble.me .msg-meta{color:#718096}
+body.light #messages{background-color:#dfe7ec;background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23888' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+body.light body::before{opacity:.4}
+
+/* Wallpaper */
+#messages.has-wallpaper{background-size:cover;background-position:center}
+.wallpaper-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:16px}
+.wallpaper-opt{aspect-ratio:16/9;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:all .15s;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:28px}
+.wallpaper-opt:hover,.wallpaper-opt.selected{border-color:var(--cyan2);box-shadow:0 0 0 3px rgba(0,200,255,.2)}
+
+/* Media grid */
+.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+.media-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;cursor:pointer;transition:opacity .15s}
+.media-thumb:hover{opacity:.8}
+
+/* Search in chat */
+.chat-search-bar{display:none;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);align-items:center;gap:8px;flex-shrink:0}
+.chat-search-bar.visible{display:flex}
+.chat-search-bar input{flex:1;border:none;background:var(--surface2);outline:none;font-size:15px;color:var(--text);padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Sans',sans-serif}
+.chat-search-bar input:focus{border-color:var(--cyan2)}
+.search-nav-btn{background:none;border:none;font-size:18px;color:var(--sub);cursor:pointer;padding:4px 6px;border-radius:8px;transition:background .15s}
+.search-nav-btn:hover{background:var(--surface2);color:var(--text)}
+.msg-highlight{background:rgba(255,220,0,0.3)!important;outline:2px solid rgba(255,200,0,0.6);border-radius:4px}
+
+/* Media panel */
+.media-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.media-panel.visible{display:flex}
+.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:16px}
+.media-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;transition:opacity .15s}
+.media-thumb:hover{opacity:.85}
+
+/* Theme toggle */
+.theme-btn{width:38px;height:38px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .15s;flex-shrink:0}
+.theme-btn:hover{background:rgba(0,200,255,.1);border-color:var(--cyan2)}
+
+/* Light mode */
+body.light-mode{
+  --bg:#F0F4F8;--white:#FFFFFF;--surface:#FFFFFF;--surface2:#F7FAFC;
+  --border:#E2E8F0;--border2:#CBD5E0;--text:#1A202C;--sub:#718096;--sub2:#A0AEC0;
+  --me-bg:#E0F7FF;--me-border:#B2EBF2;--them-bg:#FFFFFF;
+  --chat-bg:#EAE6DF;
+}
+body.light-mode #messages{background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23888888' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+body.light-mode .msg-bubble.them{background:#fff;border-color:#e2e8f0}
+body.light-mode .msg-bubble.me{background:linear-gradient(135deg,#d1f2ff,#e8f8ff);border-color:#b2e8f5}
+body.light-mode .msg-bubble.me .msg-text{color:#1a202c}
+body.light-mode .msg-bubble.me .msg-meta{color:#718096}
+body.light-mode body::before{background-image:linear-gradient(rgba(0,150,200,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,150,200,0.04) 1px,transparent 1px)}
+
+/* Chat wallpaper */
+#messages.has-wallpaper{background-size:cover;background-position:center;background-repeat:no-repeat}
+.wallpaper-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:16px}
+.wallpaper-option{aspect-ratio:16/9;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:all .15s;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px}
+.wallpaper-option:hover,.wallpaper-option.active{border-color:var(--cyan2);transform:scale(1.03)}
+
 /* Reactions */
 .reactions-wrap{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
 .reaction-pill{display:flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:13px;cursor:pointer;transition:all .15s;user-select:none}
@@ -545,8 +624,8 @@ body::before{
         </div>
       </div>
       <div class="avatar" id="my-avatar" style="width:36px;height:36px;font-size:13px;cursor:pointer;flex-shrink:0" onclick="openProfileModal()" title="Profil bearbeiten"></div>
+      <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Hell/Dunkel">🌙</button>
       <button class="icon-btn" onclick="openModal()" title="Neuer Chat">✏️</button>
-      <button class="icon-btn" onclick="signOut()" title="Abmelden">🚪</button>
     </div>
     <div class="search-bar">
       <div class="search-inner">
@@ -577,6 +656,11 @@ body::before{
       </div>
       <div style="padding:0 16px 8px">
         <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">// Session</p>
+        <div class="settings-item" onclick="document.getElementById('wallpaper-panel').classList.add('visible');initWallpaperPanel()">
+          <span class="settings-icon">🖼️</span>
+          <div><div class="settings-title">Chat-Hintergrund</div><div class="settings-sub">Hintergrundbild wählen</div></div>
+          <span style="color:var(--sub2);margin-left:auto">›</span>
+        </div>
         <div class="settings-item" onclick="signOut()">
           <span class="settings-icon">🚪</span>
           <div><div class="settings-title">Abmelden</div><div class="settings-sub">Von diesem Gerät abmelden</div></div>
@@ -668,6 +752,16 @@ body::before{
           <div class="chat-header-name" id="chat-name"></div>
           <div class="chat-header-sub" id="chat-handle"></div>
         </div>
+        <button class="icon-btn" onclick="toggleChatSearch()" title="Suchen">🔍</button>
+        <button class="icon-btn" onclick="openMediaPanel()" title="Medien">🖼️</button>
+      </div>
+      <!-- Chat search bar -->
+      <div class="chat-search-bar" id="chat-search-bar">
+        <input id="chat-search-input" placeholder="In Nachrichten suchen…" oninput="searchInChat()" autocomplete="off"/>
+        <span id="chat-search-count" style="font-size:12px;color:var(--sub);font-family:'Space Mono',monospace;white-space:nowrap"></span>
+        <button class="search-nav-btn" onclick="navigateSearch(-1)" title="Vorherige">▲</button>
+        <button class="search-nav-btn" onclick="navigateSearch(1)" title="Nächste">▼</button>
+        <button class="search-nav-btn" onclick="closeChatSearch()">✕</button>
       </div>
       <div id="messages"></div>
       <!-- Typing indicator -->
@@ -902,6 +996,11 @@ async function initSession(sess) {
     document.getElementById("my-name").textContent=myProfile?.display_name||sess.user.email||"";
     checkAdminStatus();
     requestNotificationPermission();
+    // Check if user is banned
+    if (myProfile?.is_banned) {
+      await sb.auth.signOut();
+      alert('Dein Account wurde gesperrt.' + (myProfile.banned_reason ? '\nGrund: ' + myProfile.banned_reason : '') + '\nBitte kontaktiere den Support: info@alexander-scherer.com');
+    }
     await loadConversations();
     await loadContacts();
     startPresence();
@@ -1779,13 +1878,14 @@ function renderAdminUsers(users) {
 
     card.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px">
-        <div class="avatar" style="width:44px;height:44px;font-size:16px;background:${u.avatar_color||"#00B8D9"};flex-shrink:0;overflow:hidden;position:relative">
+        <div class="avatar" style="width:44px;height:44px;font-size:16px;background:${u.avatar_color||"#00B8D9"};flex-shrink:0;overflow:hidden;position:relative;${u.is_banned?'filter:grayscale(1);opacity:.6':''}">
           ${u.avatar_url ? `<img src="${u.avatar_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:inherit"/>` : getInitials(u.display_name)}
         </div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
             <span style="font-weight:600;font-size:14px;color:var(--text)">${escHtml(u.display_name)}</span>
             ${u.is_admin ? '<span class="admin-badge">ADMIN</span>' : ''}
+            ${u.is_banned ? '<span class="banned-badge">GESPERRT</span>' : ''}
             ${isMe ? '<span style="font-size:10px;color:var(--sub2);font-family:Space Mono,monospace">(Du)</span>' : ''}
           </div>
           <div style="font-size:12px;color:var(--sub);font-family:'Space Mono',monospace">@${escHtml(u.username)}</div>
@@ -1793,16 +1893,31 @@ function renderAdminUsers(users) {
           <div style="font-size:11px;color:var(--sub2);font-family:'Space Mono',monospace;margin-top:2px">
             Beigetreten: ${joined} · Zuletzt online: ${lastSeen}
           </div>
+          ${u.is_banned && u.banned_reason ? `<div style="font-size:11px;color:#ff4444;margin-top:2px">Grund: ${escHtml(u.banned_reason)}</div>` : ''}
         </div>
       </div>
       ${!isMe ? `
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="admin-action-btn reset" onclick="adminResetPassword('${escHtml(u.email||"")}','${escHtml(u.display_name)}')">
-          🔑 PW zurücksetzen
+          🔑 PW reset
         </button>
-        <button class="admin-action-btn ${u.is_admin ? 'revoke-admin' : 'make-admin'}" 
+        <button class="admin-action-btn reset" onclick="adminEditUsername('${u.id}','${escHtml(u.username)}')">
+          ✏️ Name ändern
+        </button>
+        <button class="admin-action-btn reset" onclick="adminEditUsername('${u.id}','${escHtml(u.username)}')">
+          ✏️ Name ändern
+        </button>
+        <button class="admin-action-btn ${u.is_admin ? 'revoke-admin' : 'make-admin'}"
           onclick="adminToggleAdmin('${u.id}',${!u.is_admin},'${escHtml(u.display_name)}')">
-          ${u.is_admin ? '🛡️ Admin entziehen' : '🛡️ Zum Admin machen'}
+          ${u.is_admin ? '🛡️ Admin entziehen' : '🛡️ Admin machen'}
+        </button>
+        <button class="admin-action-btn ${u.is_banned ? 'make-admin' : 'revoke-admin'}"
+          onclick="adminBanUser('${u.id}',${u.is_banned||false},'${escHtml(u.display_name)}')">
+          ${u.is_banned ? '✅ Entsperren' : '🚫 Sperren'}
+        </button>
+        <button class="admin-action-btn revoke-admin" style="background:rgba(255,68,68,.15)"
+          onclick="adminDeleteUser('${u.id}','${escHtml(u.display_name)}')">
+          🗑️ Löschen
         </button>
       </div>` : ''}
     `;
@@ -2309,6 +2424,9 @@ async function openGroupInfo(conv) {
       const isMe = m.id === session.user.id;
       const div = document.createElement("div");
       div.style.cssText = "display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)";
+      const removeBtn = (amAdmin && !isMe && m.role !== 'admin')
+        ? `<button onclick="removeGroupMember('${conv.id}','${m.id}','${escHtml(m.display_name)}')" style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);color:#ff4444;padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">✕</button>`
+        : '';
       div.innerHTML = `
         <div class="avatar" style="width:40px;height:40px;font-size:15px;background:${m.avatar_color||"#00B8D9"};border-radius:12px;flex-shrink:0;${m.avatar_url?'overflow:hidden;position:relative':''}">
           ${m.avatar_url?`<img src="${m.avatar_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:inherit"/>`:getInitials(m.display_name)}
@@ -2317,7 +2435,8 @@ async function openGroupInfo(conv) {
           <div style="font-weight:600;font-size:14px;color:var(--text)">${escHtml(m.display_name)}${isMe?' <span style="font-size:11px;color:var(--sub2)">(Du)</span>':''}</div>
           <div style="font-size:12px;color:var(--sub);font-family:'Space Mono',monospace">@${escHtml(m.username)}</div>
         </div>
-        ${m.role==='admin'?'<span style="font-size:10px;font-weight:700;font-family:Space Mono,monospace;background:rgba(0,200,255,.12);color:var(--cyan);border:1px solid rgba(0,200,255,.2);padding:2px 8px;border-radius:20px">ADMIN</span>':''}`;
+        ${m.role==='admin'?'<span style="font-size:10px;font-weight:700;font-family:Space Mono,monospace;background:rgba(0,200,255,.12);color:var(--cyan);border:1px solid rgba(0,200,255,.2);padding:2px 8px;border-radius:20px">ADMIN</span>':''}
+        ${removeBtn}`;
       list.appendChild(div);
     });
   } catch(e) { console.error(e); }
@@ -2401,6 +2520,293 @@ async function leaveGroup() {
     await loadConversations();
   } catch(e) { alert("Fehler: " + e.message); }
 }
+
+// ── Theme Toggle ──
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('connecta_theme', isLight ? 'light' : 'dark');
+}
+(function() {
+  if (localStorage.getItem('connecta_theme') === 'light') {
+    document.body.classList.add('light');
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = '☀️';
+    });
+  }
+})();
+
+// ── Chat Search ──
+let searchMatches = [];
+let searchIndex = 0;
+
+function toggleChatSearch() {
+  const bar = document.getElementById('chat-search-bar');
+  const isVisible = bar.classList.toggle('visible');
+  if (isVisible) {
+    document.getElementById('chat-search-input').focus();
+  } else {
+    closeChatSearch();
+  }
+}
+
+function closeChatSearch() {
+  document.getElementById('chat-search-bar').classList.remove('visible');
+  document.getElementById('chat-search-input').value = '';
+  document.getElementById('chat-search-count').textContent = '';
+  // Remove highlights
+  document.querySelectorAll('.msg-highlight').forEach(el => el.classList.remove('msg-highlight'));
+  searchMatches = []; searchIndex = 0;
+}
+
+function searchInChat() {
+  const q = document.getElementById('chat-search-input').value.trim().toLowerCase();
+  document.querySelectorAll('.msg-highlight').forEach(el => el.classList.remove('msg-highlight'));
+  searchMatches = []; searchIndex = 0;
+  if (!q) { document.getElementById('chat-search-count').textContent = ''; return; }
+  document.querySelectorAll('.msg-bubble .msg-text').forEach(el => {
+    if (el.textContent.toLowerCase().includes(q)) {
+      const row = el.closest('.msg-row');
+      if (row) searchMatches.push(row);
+    }
+  });
+  document.getElementById('chat-search-count').textContent = searchMatches.length ? `1/${searchMatches.length}` : '0';
+  if (searchMatches.length) {
+    searchMatches[0].classList.add('msg-highlight');
+    searchMatches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function navigateSearch(dir) {
+  if (!searchMatches.length) return;
+  searchMatches[searchIndex].classList.remove('msg-highlight');
+  searchIndex = (searchIndex + dir + searchMatches.length) % searchMatches.length;
+  searchMatches[searchIndex].classList.add('msg-highlight');
+  searchMatches[searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('chat-search-count').textContent = `${searchIndex+1}/${searchMatches.length}`;
+}
+
+// ── Media Panel ──
+async function openMediaPanel() {
+  if (!activeConv) return;
+  document.getElementById('media-panel').classList.add('visible');
+  const container = document.getElementById('media-grid-container');
+  container.innerHTML = '<div class="empty-state">Lade Medien…</div>';
+  try {
+    const msgs = await api('/rest/v1/rpc/get_chat_media', {
+      method: 'POST', json: true,
+      body: JSON.stringify({ conv_id: activeConv.id })
+    });
+    if (!msgs?.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🖼️</div>Keine Bilder in diesem Chat.</div>';
+      document.getElementById('media-count').textContent = '';
+      return;
+    }
+    document.getElementById('media-count').textContent = msgs.length + ' Bilder';
+    const grid = document.createElement('div');
+    grid.className = 'media-grid';
+    msgs.forEach(m => {
+      const img = document.createElement('img');
+      img.className = 'media-thumb';
+      img.src = m.image_url;
+      img.loading = 'lazy';
+      img.onclick = () => { openFullscreen(m.image_url); };
+      grid.appendChild(img);
+    });
+    container.innerHTML = '';
+    container.appendChild(grid);
+  } catch(e) { container.innerHTML = '<div class="empty-state" style="color:#ff4444">Fehler: ' + e.message + '</div>'; }
+}
+
+// ── Wallpaper ──
+const WALLPAPERS = [
+  { id:'none', label:'Kein Hintergrund', emoji:'✕', bg:'' },
+  { id:'gradient1', label:'Cyan Gradient', style:'linear-gradient(135deg,#0a1628,#0d2540,#0a3060)' },
+  { id:'gradient2', label:'Purple Gradient', style:'linear-gradient(135deg,#1a0a2e,#2d1b69,#1a0a2e)' },
+  { id:'gradient3', label:'Dark Teal', style:'linear-gradient(135deg,#0a1f1f,#0d3535,#0a2828)' },
+  { id:'dots', label:'Punkte', style:'radial-gradient(circle,rgba(0,200,255,.15) 1px,transparent 1px)', size:'20px 20px', color:'var(--bg)' },
+  { id:'grid', label:'Raster', style:'linear-gradient(rgba(0,200,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,.08) 1px,transparent 1px)', size:'30px 30px', color:'var(--bg)' },
+  { id:'circuit', label:'Circuit', style:'linear-gradient(45deg,rgba(0,200,255,.05) 25%,transparent 25%),linear-gradient(-45deg,rgba(0,200,255,.05) 25%,transparent 25%)', size:'40px 40px', color:'var(--bg)' },
+  { id:'space', label:'Space', style:'radial-gradient(ellipse at top,#0d1b3e,#0a0e1a)', size:'', color:'' },
+  { id:'forest', label:'Forest', style:'linear-gradient(135deg,#0a1f0a,#143d14,#0a2a14)', size:'', color:'' },
+];
+
+function initWallpaperPanel() {
+  const grid = document.getElementById('wallpaper-grid');
+  if (grid.children.length) return;
+  const saved = localStorage.getItem('connecta_wallpaper') || 'none';
+  WALLPAPERS.forEach(w => {
+    const div = document.createElement('div');
+    div.className = 'wallpaper-opt' + (w.id === saved ? ' selected' : '');
+    if (w.style) {
+      div.style.backgroundImage = w.style;
+      if (w.size) div.style.backgroundSize = w.size;
+      if (w.color) div.style.backgroundColor = w.color;
+    } else {
+      div.style.background = 'var(--surface2)';
+      div.style.border = '2px solid var(--border)';
+    }
+    div.innerHTML = w.emoji ? `<span style="font-size:24px">${w.emoji}</span>` : '';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:10px;color:var(--sub);margin-top:4px;font-family:Space Mono,monospace;text-align:center;padding:0 4px';
+    label.textContent = w.label;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px';
+    wrap.appendChild(div);
+    wrap.appendChild(label);
+    wrap.onclick = () => applyWallpaper(w);
+    grid.appendChild(wrap);
+  });
+}
+
+function applyWallpaper(w) {
+  const msgs = document.getElementById('messages');
+  document.querySelectorAll('.wallpaper-opt').forEach(el => el.classList.remove('selected'));
+  if (!w.style) {
+    msgs.classList.remove('has-wallpaper');
+    msgs.style.backgroundImage = '';
+    msgs.style.backgroundColor = '';
+    msgs.style.backgroundSize = '';
+    localStorage.removeItem('connecta_wallpaper');
+  } else {
+    msgs.classList.add('has-wallpaper');
+    msgs.style.backgroundImage = w.style;
+    msgs.style.backgroundColor = w.color || '';
+    msgs.style.backgroundSize = w.size || 'cover';
+    localStorage.setItem('connecta_wallpaper', w.id);
+  }
+  // Re-init to show selected
+  document.getElementById('wallpaper-grid').innerHTML = '';
+  initWallpaperPanel();
+}
+
+function clearWallpaper() {
+  applyWallpaper(WALLPAPERS[0]);
+  document.getElementById('wallpaper-panel').classList.remove('visible');
+}
+
+// Restore wallpaper on load
+(function() {
+  const saved = localStorage.getItem('connecta_wallpaper');
+  if (saved && saved !== 'none') {
+    const w = WALLPAPERS.find(x => x.id === saved);
+    if (w) {
+      document.addEventListener('DOMContentLoaded', () => {
+        const msgs = document.getElementById('messages');
+        if (msgs) applyWallpaper(w);
+      });
+    }
+  }
+})();
+
+// ── Remove group member (admin only) ──
+async function removeGroupMember(convId, userId, name) {
+  if (!confirm(name + ' aus der Gruppe entfernen?')) return;
+  try {
+    await api('/rest/v1/rpc/remove_group_member', {
+      method: 'POST', json: true,
+      body: JSON.stringify({ conv_id: convId, target_user_id: userId })
+    });
+    await openGroupInfo(currentGroupConv);
+  } catch(e) { alert('Fehler: ' + e.message); }
+}
+
+// ── Admin Extensions ──
+
+// Stats
+async function showAdminStats() {
+  const panel = document.getElementById('admin-stats-panel');
+  const isVisible = panel.style.display !== 'none';
+  if (isVisible) { panel.style.display = 'none'; return; }
+  panel.style.display = 'flex';
+  panel.innerHTML = '<div style="color:var(--sub);font-size:13px;width:100%">Lade Statistiken…</div>';
+  try {
+    const stats = await api('/rest/v1/rpc/admin_get_stats', { method:'POST', json:true, body:'{}' });
+    panel.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:10px;width:100%">
+        <div class="stat-card"><div class="stat-value">${stats.total_users}</div><div class="stat-label">Nutzer gesamt</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#22c55e">${stats.online_now}</div><div class="stat-label">Jetzt online</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.active_today}</div><div class="stat-label">Aktiv heute</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.new_users_today}</div><div class="stat-label">Neu heute</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.messages_today}</div><div class="stat-label">Nachrichten heute</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.messages_total}</div><div class="stat-label">Nachrichten gesamt</div></div>
+        <div class="stat-card"><div class="stat-value">${stats.total_conversations}</div><div class="stat-label">Chats gesamt</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:#ff4444">${stats.banned_users}</div><div class="stat-label">Gesperrt</div></div>
+      </div>`;
+  } catch(e) {
+    panel.innerHTML = `<div style="color:#ff4444;font-size:13px">Fehler: ${e.message}</div>`;
+  }
+}
+
+// Ban/Unban
+let pendingBanUserId = null;
+
+function adminBanUser(userId, currentlyBanned, name) {
+  if (currentlyBanned) {
+    // Unban directly
+    adminExecuteBan(userId, false, null, name);
+    return;
+  }
+  // Show reason modal
+  pendingBanUserId = userId;
+  document.getElementById('ban-reason-input').value = '';
+  document.getElementById('ban-modal').style.display = 'flex';
+  document.getElementById('ban-confirm-btn').onclick = async () => {
+    const reason = document.getElementById('ban-reason-input').value.trim() || null;
+    document.getElementById('ban-modal').style.display = 'none';
+    await adminExecuteBan(userId, true, reason, name);
+  };
+}
+
+async function adminExecuteBan(userId, ban, reason, name) {
+  try {
+    await api('/rest/v1/rpc/admin_ban_user', {
+      method: 'POST', json: true,
+      body: JSON.stringify({ target_id: userId, ban: ban, reason: reason })
+    });
+    // Update locally
+    const u = allAdminUsers.find(x => x.id === userId);
+    if (u) { u.is_banned = ban; }
+    renderAdminUsers(allAdminUsers);
+    alert(ban ? `✅ ${name} wurde gesperrt.` : `✅ ${name} wurde entsperrt.`);
+  } catch(e) { alert('Fehler: ' + e.message); }
+}
+
+// Admin delete user
+async function adminDeleteUser(userId, name) {
+  if (!confirm(`Nutzer "${name}" dauerhaft löschen?\n\nAlle Nachrichten und Daten werden gelöscht. Diese Aktion ist nicht rückgängig zu machen.`)) return;
+  // Double confirm
+  const input = prompt(`Tippe den Namen "${name}" zur Bestätigung ein:`);
+  if (input !== name) { alert('Name stimmt nicht überein. Abgebrochen.'); return; }
+  try {
+    await api('/rest/v1/rpc/admin_delete_user', {
+      method: 'POST', json: true,
+      body: JSON.stringify({ target_id: userId })
+    });
+    allAdminUsers = allAdminUsers.filter(u => u.id !== userId);
+    document.getElementById('admin-user-count').textContent = allAdminUsers.length + ' Nutzer';
+    renderAdminUsers(allAdminUsers);
+    alert(`✅ Nutzer "${name}" wurde gelöscht.`);
+  } catch(e) { alert('Fehler: ' + e.message); }
+}
+
+// ── Admin: Edit Username ──
+async function adminEditUsername(userId, currentUsername) {
+  const newName = prompt('Neuen Namen für @' + currentUsername + ' eingeben:', currentUsername);
+  if (!newName || newName.trim() === currentUsername) return;
+  try {
+    await api('/rest/v1/rpc/admin_update_username', {
+      method: 'POST', json: true,
+      body: JSON.stringify({ target_id: userId, new_username: newName.trim() })
+    });
+    // Update locally
+    const u = allAdminUsers.find(x => x.id === userId);
+    if (u) { u.username = newName.trim(); u.display_name = newName.trim(); }
+    renderAdminUsers(allAdminUsers);
+    alert('✅ Name wurde auf "' + newName.trim() + '" geändert.');
+  } catch(e) { alert('Fehler: ' + e.message); }
+}
 </script>
 <!-- EMOJI PICKER -->
 <div class="emoji-picker" id="emoji-picker">
@@ -2439,15 +2845,19 @@ async function leaveGroup() {
 <div id="admin-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;flex-direction:column;backdrop-filter:blur(8px)">
   <div style="background:var(--surface);height:100%;max-width:700px;width:100%;margin:0 auto;display:flex;flex-direction:column;border-left:1px solid var(--border);border-right:1px solid var(--border)">
     <!-- Header -->
-    <div style="padding:calc(16px + var(--safe-top)) 20px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <div style="padding:calc(16px + var(--safe-top)) 20px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0">
       <button onclick="document.getElementById('admin-overlay').style.display='none'" style="background:none;border:none;font-size:20px;color:var(--sub);cursor:pointer;padding:4px">✕</button>
       <div>
         <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:16px;color:var(--cyan)">🛡️ Admin-Panel</div>
         <div style="font-size:12px;color:var(--sub);margin-top:2px">Nutzerverwaltung & Support</div>
       </div>
-      <div style="margin-left:auto">
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button onclick="showAdminStats()" style="background:rgba(0,200,255,.1);border:1px solid rgba(0,200,255,.3);color:var(--cyan);padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Space Mono',monospace">📊 Stats</button>
         <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2)" id="admin-user-count"></div>
       </div>
+    </div>
+    <!-- Stats panel (hidden by default) -->
+    <div id="admin-stats-panel" style="display:none;padding:14px 20px;background:var(--surface2);border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap">
     </div>
     <!-- Search -->
     <div style="padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0">
@@ -2496,6 +2906,45 @@ async function leaveGroup() {
         <button onclick="leaveGroup()" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,68,68,.1);color:#ff4444;border:1px solid rgba(255,68,68,.3);font-weight:600;font-size:14px;cursor:pointer">🚪 Gruppe verlassen</button>
       </div>
     </div>
+  </div>
+</div>
+<!-- MEDIA PANEL -->
+<div class="media-panel" id="media-panel">
+  <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:500px;max-height:85dvh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 40px rgba(0,0,0,.4);animation:slideUp .28s cubic-bezier(.4,0,.2,1)">
+    <div style="width:32px;height:3px;background:var(--border2);border-radius:2px;margin:12px auto 4px;flex-shrink:0"></div>
+    <div style="padding:8px 18px 14px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <button onclick="document.getElementById('media-panel').classList.remove('visible')" style="background:none;border:none;font-size:16px;color:var(--sub);cursor:pointer;padding:8px;border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">✕</button>
+      <h3 style="font-family:'Space Mono',monospace;font-size:16px;font-weight:700;flex:1">// MEDIEN</h3>
+      <span id="media-count" style="font-size:12px;color:var(--sub2);font-family:'Space Mono',monospace"></span>
+    </div>
+    <div id="media-grid-container" style="overflow-y:auto;flex:1;padding:4px"></div>
+  </div>
+</div>
+
+<!-- WALLPAPER PANEL -->
+<div class="media-panel" id="wallpaper-panel">
+  <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:500px;max-height:85dvh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 40px rgba(0,0,0,.4);animation:slideUp .28s cubic-bezier(.4,0,.2,1)">
+    <div style="width:32px;height:3px;background:var(--border2);border-radius:2px;margin:12px auto 4px;flex-shrink:0"></div>
+    <div style="padding:8px 18px 14px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <button onclick="document.getElementById('wallpaper-panel').classList.remove('visible')" style="background:none;border:none;font-size:16px;color:var(--sub);cursor:pointer;padding:8px;border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">✕</button>
+      <h3 style="font-family:'Space Mono',monospace;font-size:16px;font-weight:700;flex:1">// HINTERGRUND</h3>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <div class="wallpaper-grid" id="wallpaper-grid"></div>
+      <div style="padding:0 16px 20px">
+        <button onclick="clearWallpaper()" style="width:100%;padding:11px;border-radius:12px;background:var(--surface2);color:var(--sub);border:1px solid var(--border);font-size:14px;cursor:pointer;font-weight:500">✕ Hintergrund entfernen</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- BAN REASON MODAL -->
+<div id="ban-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:600;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;padding:28px 24px;width:calc(100% - 48px);max-width:360px;border:1px solid var(--border);box-shadow:var(--shadow-lg)">
+    <h3 style="font-family:'Space Mono',monospace;font-size:15px;color:#FF4444;margin-bottom:8px">🚫 Nutzer sperren</h3>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:16px">Grund für die Sperre (optional):</p>
+    <input id="ban-reason-input" class="auth-input" placeholder="z.B. Spam, unangemessenes Verhalten…" style="margin-bottom:16px"/>
+    <button id="ban-confirm-btn" style="width:100%;padding:12px;border-radius:12px;background:#FF4444;color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer;margin-bottom:8px">Nutzer sperren</button>
+    <button onclick="document.getElementById('ban-modal').style.display='none'" style="width:100%;padding:11px;border-radius:12px;background:var(--surface2);color:var(--sub);border:1px solid var(--border);cursor:pointer;font-size:14px">Abbrechen</button>
   </div>
 </div>
 </body>
