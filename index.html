@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>Connecta</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=Roboto:wght@300;400;500;700&family=Playfair+Display:wght@400;600;700&family=Courier+Prime:wght@400;700&family=Nunito:wght@400;600;700&family=Merriweather:wght@300;400;700&family=Dancing+Script:wght@400;600;700&family=Oswald:wght@400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -834,6 +834,10 @@ body.light-mode body::before{background-image:linear-gradient(rgba(0,150,200,0.0
       <div><p class="color-label">Avatar-Farbe (wenn kein Bild)</p><div class="color-row" id="profile-color-row"></div></div>
       <div><p class="color-label">Anzeigename</p><input class="auth-input" id="profile-displayname" placeholder="Anzeigename"/></div>
       <div><p class="color-label">Status</p><input class="auth-input" id="profile-status" placeholder="Hey, ich nutze Connecta!"/></div>
+      <div>
+        <p class="color-label">Schriftart für Nachrichten</p>
+        <div id="font-picker" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
       <p id="profile-msg" style="font-size:13px;text-align:center"></p>
       <button class="auth-btn" id="profile-save-btn" onclick="saveProfile()" style="margin-top:0">Speichern</button>
     </div>
@@ -1312,9 +1316,10 @@ async function openConversation(conv) {
     document.getElementById("chat-header-info-wrap").style.cursor = "pointer";
     document.getElementById("chat-header-info-wrap").onclick = () => openGroupInfo(conv);
   } else {
-    document.getElementById("chat-avatar").style.cursor = "default";
-    document.getElementById("chat-avatar").onclick = null;
-    document.getElementById("chat-header-info-wrap").onclick = null;
+    document.getElementById("chat-avatar").style.cursor = "pointer";
+    document.getElementById("chat-avatar").onclick = () => openProfileView(conv.otherProfile);
+    document.getElementById("chat-header-info-wrap").style.cursor = "pointer";
+    document.getElementById("chat-header-info-wrap").onclick = () => openProfileView(conv.otherProfile);
     const isOnline = getOnlineStatus(conv.otherProfile?.last_seen);
     const onlineText = isOnline ? "🟢 Online" : ("⚪ " + (conv.otherProfile?.last_seen ? "Zuletzt gesehen "+formatTime(conv.otherProfile.last_seen) : "Offline"));
     const statusText = conv.otherProfile?.status;
@@ -1463,7 +1468,7 @@ function appendMessage(msg, scroll=true) {
       <span class="voice-duration">${durStr}</span>
     </div>`;
   }
-  if (msg.content) inner += `<span class="msg-text">${escHtml(msg.content)}</span>`;
+  if (msg.content) inner += `<span class="msg-text" style="${msg.font_family?'font-family:'+msg.font_family+',sans-serif':''}"> ${escHtml(msg.content)}</span>`;
   inner += `<span class="msg-meta">${formatTime(msg.created_at)}${msg.edited_at ? '<span class="msg-edited"> bearbeitet</span>' : ""}${isMe ? '<span class="tick">✓✓</span>' : ""}</span>`;
 
   const bubble = document.createElement("div");
@@ -1513,7 +1518,7 @@ async function sendMessage() {
   try {
     let image_url=null;
     if (imgToSend) image_url=await uploadImage(imgToSend);
-    const body={conversation_id:activeConv.id,sender_id:session.user.id};
+    const body={conversation_id:activeConv.id,sender_id:session.user.id,font_family:myProfile?.font_family||null};
     if (content) body.content=content;
     if (image_url) body.image_url=image_url;
     if (replyToMsg) {
@@ -2951,6 +2956,172 @@ async function adminShowLoginHistory(userId, displayName) {
     list.innerHTML = `<div class="empty-state" style="color:#ff4444">Fehler: ${e.message}</div>`;
   }
 }
+
+// ── Fonts ──
+const FONTS = [
+  { name: 'DM Sans',          label: 'Standard (DM Sans)',     sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Roboto',           label: 'Roboto',                  sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Nunito',           label: 'Nunito (rund)',           sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Lato',             label: 'Lato (schlank)',          sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Merriweather',     label: 'Merriweather (Serif)',    sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Playfair Display', label: 'Playfair (elegant)',      sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Oswald',           label: 'Oswald (kompakt)',        sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Courier Prime',    label: 'Courier (Mono)',          sample: 'Hallo! Wie geht es dir?' },
+  { name: 'Dancing Script',   label: 'Dancing Script (kursiv)', sample: 'Hallo! Wie geht es dir?' },
+];
+
+let selectedFont = 'DM Sans';
+
+function initFontPicker() {
+  const picker = document.getElementById('font-picker');
+  if (!picker || picker.children.length) return;
+  const current = myProfile?.font_family || 'DM Sans';
+  selectedFont = current;
+  FONTS.forEach(f => {
+    const btn = document.createElement('div');
+    btn.style.cssText = `display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;cursor:pointer;border:1.5px solid ${f.name===current?'var(--cyan2)':'var(--border)'};background:${f.name===current?'rgba(0,200,255,.08)':'var(--surface2)'};transition:all .15s`;
+    btn.innerHTML = `
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--text);font-family:'${f.name}',sans-serif">${f.label}</div>
+        <div style="font-size:13px;color:var(--sub);font-family:'${f.name}',sans-serif;margin-top:2px">${f.sample}</div>
+      </div>
+      <span style="display:${f.name===current?'block':'none'};color:var(--cyan);font-size:18px" id="font-check-${f.name.replace(/ /g,'_')}">✓</span>`;
+    btn.onclick = () => {
+      selectedFont = f.name;
+      picker.querySelectorAll('div').forEach(b => {
+        b.style.borderColor = 'var(--border)';
+        b.style.background = 'var(--surface2)';
+      });
+      btn.style.borderColor = 'var(--cyan2)';
+      btn.style.background = 'rgba(0,200,255,.08)';
+      picker.querySelectorAll('[id^="font-check-"]').forEach(el => el.style.display = 'none');
+      const checkEl = document.getElementById('font-check-'+f.name.replace(/ /g,'_'));
+      if (checkEl) checkEl.style.display = 'block';
+    };
+    picker.appendChild(btn);
+  });
+}
+
+// Override openProfileModal to init font picker
+const _origOpenProfileModal = openProfileModal;
+function openProfileModal() {
+  _origOpenProfileModal();
+  setTimeout(initFontPicker, 50);
+}
+
+// Override saveProfile to also save font
+const _origSaveProfile = saveProfile;
+async function saveProfile() {
+  // Patch font into body before save
+  const origBody = JSON.stringify;
+  const fontToSave = selectedFont || 'DM Sans';
+  // We intercept the fetch by temporarily patching font
+  const prevFont = myProfile?.font_family;
+  if (myProfile) myProfile.font_family = fontToSave;
+  await _origSaveProfile();
+  // Also patch font separately if needed
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + session.user.id, {
+      method: 'PATCH',
+      headers: { ...HJ(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ font_family: fontToSave })
+    });
+    if (myProfile) myProfile.font_family = fontToSave;
+  } catch(e) {}
+}
+
+// ── Profile View ──
+async function openProfileView(profile) {
+  if (!profile) return;
+  const overlay = document.getElementById('profile-view-overlay');
+  overlay.style.display = 'flex';
+
+  // Avatar
+  const avEl = document.getElementById('pv-avatar');
+  avEl.style.background = profile.avatar_color || '#00B8D9';
+  avEl.style.fontSize = '32px';
+  if (profile.avatar_url) {
+    avEl.innerHTML = `<img src="${profile.avatar_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:inherit"/>`;
+  } else {
+    avEl.textContent = getInitials(profile.display_name);
+  }
+
+  // Name & username
+  document.getElementById('pv-name').textContent = profile.display_name || '';
+  document.getElementById('pv-username').textContent = '@' + (profile.username || '');
+
+  // Status
+  const statusWrap = document.getElementById('pv-status-wrap');
+  const statusEl = document.getElementById('pv-status');
+  if (profile.status) {
+    statusWrap.style.display = 'block';
+    statusEl.textContent = profile.status;
+  } else {
+    statusWrap.style.display = 'none';
+  }
+
+  // Online status
+  const onlineEl = document.getElementById('pv-online');
+  const isOnline = getOnlineStatus(profile.last_seen);
+  onlineEl.textContent = isOnline ? '🟢 Online' : ('⚪ Zuletzt gesehen ' + (profile.last_seen ? formatTime(profile.last_seen) : ''));
+  onlineEl.style.color = isOnline ? '#22c55e' : 'var(--sub2)';
+
+  // Font
+  const fontWrap = document.getElementById('pv-font-wrap');
+  if (profile.font_family && profile.font_family !== 'DM Sans') {
+    fontWrap.style.display = 'block';
+    fontWrap.textContent = '✏️ Schreibt in: ' + profile.font_family;
+  } else {
+    fontWrap.style.display = 'none';
+  }
+
+  // Chat button
+  const chatBtn = document.getElementById('pv-chat-btn');
+  chatBtn.onclick = async () => {
+    overlay.style.display = 'none';
+    const existing = conversations.find(c => c.otherProfile?.id === profile.id);
+    if (existing) { switchTab('chats'); openConversation(existing); return; }
+    try {
+      const convId = await api('/rest/v1/rpc/create_conversation', { method:'POST', json:true, body:JSON.stringify({other_user_id:profile.id}) });
+      await loadConversations();
+      const newConv = conversations.find(c=>c.id===convId)||{id:convId,otherProfile:profile,lastMsg:null};
+      switchTab('chats');
+      openConversation({...newConv, otherProfile:profile});
+    } catch(e) { alert('Fehler: ' + e.message); }
+  };
+
+  // Contact button
+  const contactBtn = document.getElementById('pv-contact-btn');
+  const isContact = myContacts.some(c => c.id === profile.id);
+  const isMe = profile.id === session?.user?.id;
+  if (isMe) {
+    contactBtn.style.display = 'none';
+    chatBtn.style.display = 'none';
+  } else {
+    contactBtn.style.display = 'block';
+    chatBtn.style.display = 'block';
+    contactBtn.textContent = isContact ? '✅' : '➕';
+    contactBtn.title = isContact ? 'Bereits Kontakt' : 'Kontakt hinzufügen';
+    contactBtn.onclick = async () => {
+      if (!isContact) {
+        await addContact(profile.id);
+        contactBtn.textContent = '✅';
+        contactBtn.title = 'Bereits Kontakt';
+      }
+    };
+  }
+}
+
+// Make avatars clickable in conversation list & contacts
+const _origRenderContacts = renderContacts;
+function renderContacts() {
+  _origRenderContacts();
+  // Add click handler to avatars in contacts list
+  document.querySelectorAll('#contacts-list .avatar').forEach((av, i) => {
+    av.style.cursor = 'pointer';
+    av.onclick = () => openProfileView(myContacts[i]);
+  });
+}
 </script>
 <!-- EMOJI PICKER -->
 <div class="emoji-picker" id="emoji-picker">
@@ -3104,6 +3275,38 @@ async function adminShowLoginHistory(userId, displayName) {
       <span id="login-history-count" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2)"></span>
     </div>
     <div id="login-history-list" style="overflow-y:auto;flex:1;padding:8px 0"></div>
+  </div>
+</div>
+<!-- PROFILE VIEW MODAL -->
+<div id="profile-view-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:480px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 40px rgba(0,0,0,.4);animation:slideUp .28s cubic-bezier(.4,0,.2,1)">
+    <div style="width:32px;height:3px;background:var(--border2);border-radius:2px;margin:12px auto 4px;flex-shrink:0"></div>
+    <div style="padding:8px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <button onclick="document.getElementById('profile-view-overlay').style.display='none'" style="background:none;border:none;font-size:16px;color:var(--sub);cursor:pointer;padding:8px;border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">✕</button>
+      <h3 style="font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--text);flex:1">// PROFIL</h3>
+    </div>
+    <!-- Profile content -->
+    <div style="padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <div id="pv-avatar" class="avatar" style="width:88px;height:88px;font-size:32px;border-radius:24px;overflow:hidden;position:relative;flex-shrink:0"></div>
+      <div style="text-align:center">
+        <div id="pv-name" style="font-weight:700;font-size:20px;color:var(--text)"></div>
+        <div id="pv-username" style="font-size:13px;color:var(--sub);font-family:'Space Mono',monospace;margin-top:3px"></div>
+      </div>
+      <!-- Status -->
+      <div id="pv-status-wrap" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 18px;width:100%;text-align:center;display:none">
+        <div style="font-size:11px;color:var(--sub2);font-family:'Space Mono',monospace;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Status</div>
+        <div id="pv-status" style="font-size:15px;color:var(--text);line-height:1.5"></div>
+      </div>
+      <!-- Online status -->
+      <div id="pv-online" style="font-size:12px;font-family:'Space Mono',monospace"></div>
+      <!-- Font -->
+      <div id="pv-font-wrap" style="font-size:12px;color:var(--sub2);font-family:'Space Mono',monospace;display:none"></div>
+      <!-- Actions -->
+      <div style="display:flex;gap:10px;width:100%;margin-top:4px">
+        <button id="pv-chat-btn" style="flex:1;padding:12px;border-radius:12px;background:linear-gradient(135deg,var(--cyan2),var(--accent));color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer">💬 Nachricht senden</button>
+        <button id="pv-contact-btn" style="padding:12px 16px;border-radius:12px;background:var(--surface2);color:var(--sub);border:1px solid var(--border);font-size:18px;cursor:pointer">👤</button>
+      </div>
+    </div>
   </div>
 </div>
 </body>
