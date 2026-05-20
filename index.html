@@ -1235,30 +1235,115 @@ async function openConversation(conv) {
     .subscribe();
   subscribeTyping(conv);
   hideTypingIndicator();
-  markAsRead(conv.id);
+  await markAsRead(conv.id);
   if (!isMobile()) msgInput.focus();
 }
 
 let lastDateStr=null;
 function renderMessages(msgs) { const el=document.getElementById("messages"); el.innerHTML=""; lastDateStr=null; msgs.forEach(m=>appendMessage(m,false)); el.scrollTop=el.scrollHeight; }
-function appendMessage(msg,scroll=true) {
-  const el=document.getElementById("messages");
-  const d=new Date(msg.created_at),dateStr=d.toDateString();
-  if (dateStr!==lastDateStr) {
-    lastDateStr=dateStr;
-    const div=document.createElement("div"); div.className="date-divider";
-    div.innerHTML=`<span class="date-pill">${d.toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}</span>`;
+function appendMessage(msg, scroll=true) {
+  const el = document.getElementById("messages");
+  const d = new Date(msg.created_at), dateStr = d.toDateString();
+  if (dateStr !== lastDateStr) {
+    lastDateStr = dateStr;
+    const div = document.createElement("div"); div.className = "date-divider";
+    div.innerHTML = `<span class="date-pill">${d.toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}</span>`;
     el.appendChild(div);
   }
-  const isMe=msg.sender_id===session?.user?.id;
-  const row=document.createElement("div"); row.className="msg-row"+(isMe?" me":"");
-  let inner="";
-  if (msg.image_url) inner+=`<img class="msg-img" src="${msg.image_url}" alt="Bild" onclick="openFullscreen('${msg.image_url}')"/>`;
-  if (msg.content) inner+=`<span class="msg-text">${escHtml(msg.content)}</span>`;
-  inner+=`<span class="msg-meta">${formatTime(msg.created_at)}${isMe?'<span class="tick">✓✓</span>':""}</span>`;
-  row.innerHTML=`<div class="msg-bubble ${isMe?"me":"them"}">${inner}</div>`;
+  const isMe = msg.sender_id === session?.user?.id;
+  const row = document.createElement("div");
+  row.className = "msg-row" + (isMe ? " me" : "");
+  row.id = "msg-" + msg.id;
+  row.dataset.msgId = msg.id;
+
+  // Quick reactions popup
+  const qr = document.createElement("div");
+  qr.className = "quick-reactions";
+  qr.id = "qr-" + msg.id;
+  ["👍","❤️","😂","😮","😢","🔥"].forEach(e => {
+    const btn = document.createElement("button");
+    btn.className = "qr-btn"; btn.textContent = e;
+    btn.onclick = (ev) => { ev.stopPropagation(); toggleReaction(msg.id, e); qr.classList.remove("visible"); };
+    qr.appendChild(btn);
+  });
+
+  // Action buttons
+  const actions = document.createElement("div");
+  actions.className = "msg-actions";
+
+  const replyBtn = document.createElement("button");
+  replyBtn.className = "msg-action-btn"; replyBtn.title = "Antworten"; replyBtn.textContent = "↩️";
+  replyBtn.onclick = (ev) => { ev.stopPropagation(); setReply(msg); };
+  actions.appendChild(replyBtn);
+
+  const reactBtn = document.createElement("button");
+  reactBtn.className = "msg-action-btn"; reactBtn.title = "Reaktion"; reactBtn.textContent = "😊";
+  reactBtn.onclick = (ev) => {
+    ev.stopPropagation();
+    document.querySelectorAll(".quick-reactions.visible").forEach(q => q.classList.remove("visible"));
+    qr.classList.toggle("visible");
+  };
+  actions.appendChild(reactBtn);
+
+  if (isMe) {
+    const editBtn = document.createElement("button");
+    editBtn.className = "msg-action-btn"; editBtn.title = "Bearbeiten"; editBtn.textContent = "✏️";
+    editBtn.onclick = (ev) => { ev.stopPropagation(); startEditMessage(msg); };
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "msg-action-btn"; delBtn.title = "Löschen"; delBtn.textContent = "🗑️";
+    delBtn.onclick = (ev) => { ev.stopPropagation(); deleteMessage(msg.id); };
+    actions.appendChild(delBtn);
+  }
+
+  // Bubble content
+  let inner = "";
+  if (activeConv?.is_group && !isMe) {
+    const senderName = activeConv.groupMembers?.find(m => m.id === msg.sender_id)?.display_name || "";
+    if (senderName) inner += `<div class="msg-sender-name">${escHtml(senderName)}</div>`;
+  }
+  if (msg.reply_to_id && msg.reply_preview) {
+    const parts = msg.reply_preview.split(":");
+    const rName = parts[0] || "";
+    const rText = parts.slice(1).join(":") || msg.reply_preview;
+    inner += `<div class="reply-preview" onclick="scrollToMessage('${msg.reply_to_id}')">
+      <div class="reply-preview-name">${escHtml(rName)}</div>
+      <div class="reply-preview-text">${escHtml(rText)}</div>
+    </div>`;
+  }
+  if (msg.image_url) inner += `<img class="msg-img" src="${msg.image_url}" alt="Bild" onclick="openFullscreen('${msg.image_url}')"/>`;
+  if (msg.voice_url) {
+    const dur = msg.voice_duration || 0;
+    const durStr = Math.floor(dur/60) + ":" + String(dur%60).padStart(2,"0");
+    inner += `<div class="voice-player">
+      <button class="play-btn" onclick="playVoice(this,'${msg.voice_url}')">▶</button>
+      <div class="voice-progress" onclick="seekVoice(event,this,'${msg.voice_url}')">
+        <div class="voice-progress-fill"></div>
+      </div>
+      <span class="voice-duration">${durStr}</span>
+    </div>`;
+  }
+  if (msg.content) inner += `<span class="msg-text">${escHtml(msg.content)}</span>`;
+  inner += `<span class="msg-meta">${formatTime(msg.created_at)}${msg.edited_at ? '<span class="msg-edited"> bearbeitet</span>' : ""}${isMe ? '<span class="tick">✓✓</span>' : ""}</span>`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble " + (isMe ? "me" : "them");
+  bubble.innerHTML = inner;
+
+  // Reactions container
+  const reactionsWrap = document.createElement("div");
+  reactionsWrap.className = "reactions-wrap";
+  reactionsWrap.id = "reactions-" + msg.id;
+
+  row.appendChild(qr);
+  row.appendChild(actions);
+  row.appendChild(bubble);
+  row.appendChild(reactionsWrap);
   el.appendChild(row);
-  if (scroll) el.scrollTop=el.scrollHeight;
+
+  loadReactions(msg.id);
+  if (scroll) el.scrollTop = el.scrollHeight;
 }
 function openFullscreen(url) { document.getElementById("img-fullscreen-img").src=url; document.getElementById("img-fullscreen").classList.add("visible"); }
 
@@ -1636,15 +1721,14 @@ function subscribeTyping(conv) {
 // ── Mark as read ──
 async function markAsRead(convId) {
   if (!session || !convId) return;
+  // Clear badge immediately in UI
+  const conv = conversations.find(c => c.id === convId);
+  if (conv) { conv.unread = 0; renderConversations(); }
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/conversation_participants?conversation_id=eq." + convId + "&user_id=eq." + session.user.id, {
-      method: "PATCH",
-      headers: { ...HJ(), "Prefer": "return=minimal" },
-      body: JSON.stringify({ last_read: new Date().toISOString() })
+    await api("/rest/v1/rpc/mark_conversation_read", {
+      method: "POST", json: true,
+      body: JSON.stringify({ conv_id: convId })
     });
-    // Immediately clear badge locally
-    const conv = conversations.find(c => c.id === convId);
-    if (conv) { conv.unread = 0; renderConversations(); }
   } catch(e) { console.error("markAsRead error:", e); }
 }
 
@@ -1788,6 +1872,11 @@ function showPushNotification(msg) {
 // Request permission on page visibility change (after user interaction)
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && activeConv) markAsRead(activeConv.id);
+});
+
+// Mark as read when window gets focus
+window.addEventListener("focus", () => {
+  if (activeConv) markAsRead(activeConv.id);
 });
 
 // ── Online Status ──
@@ -2197,13 +2286,23 @@ async function createGroupChat() {
 }
 
 // Group info panel
+let currentGroupConv = null;
+
 async function openGroupInfo(conv) {
+  currentGroupConv = conv;
   document.getElementById("group-info-panel").classList.add("visible");
   document.getElementById("group-panel-name").textContent = conv.group_name || "Gruppe";
+  document.getElementById("add-member-search").value = "";
+  document.getElementById("add-member-results").innerHTML = "";
   try {
     const members = await api("/rest/v1/rpc/get_group_members", { method:"POST", json:true, body:JSON.stringify({conv_id:conv.id}) });
     conv.groupMembers = members || [];
     document.getElementById("group-panel-count").textContent = members.length + " Mitglieder";
+
+    // Show add-member section only for admins
+    const amAdmin = members.find(m => m.id === session.user.id && m.role === 'admin');
+    document.getElementById("add-member-section").style.display = amAdmin ? "block" : "none";
+
     const list = document.getElementById("group-members-list");
     list.innerHTML = "";
     members.forEach(m => {
@@ -2222,6 +2321,74 @@ async function openGroupInfo(conv) {
       list.appendChild(div);
     });
   } catch(e) { console.error(e); }
+}
+
+async function searchNewMember() {
+  const q = document.getElementById("add-member-search").value.trim();
+  const results = document.getElementById("add-member-results");
+  if (q.length < 3) { results.innerHTML = ""; return; }
+  results.innerHTML = '<div style="font-size:13px;color:var(--sub);padding:6px 0">Suche…</div>';
+  try {
+    const users = await api("/rest/v1/rpc/search_user_for_contact", {
+      method: "POST", json: true, body: JSON.stringify({ search_term: q })
+    });
+    results.innerHTML = "";
+    if (!users?.length) {
+      results.innerHTML = '<div style="font-size:13px;color:var(--sub);padding:6px 0">Kein Nutzer gefunden.</div>';
+      return;
+    }
+    users.forEach(u => {
+      const alreadyMember = currentGroupConv?.groupMembers?.some(m => m.id === u.id);
+      const div = document.createElement("div");
+      div.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)";
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.style.cssText = `width:36px;height:36px;font-size:13px;background:${u.avatar_color||"#00B8D9"};border-radius:10px;flex-shrink:0`;
+      avatar.textContent = getInitials(u.display_name);
+
+      const info = document.createElement("div");
+      info.style.cssText = "flex:1;min-width:0";
+      info.innerHTML = `<div style="font-weight:600;font-size:13px;color:var(--text)">${escHtml(u.display_name)}</div><div style="font-size:11px;color:var(--sub);font-family:'Space Mono',monospace">@${escHtml(u.username)}</div>`;
+
+      const btn = document.createElement("button");
+      if (alreadyMember) {
+        btn.textContent = "✓ Dabei";
+        btn.style.cssText = "padding:5px 10px;border-radius:8px;background:transparent;color:var(--sub);border:1px solid var(--border);font-size:12px;cursor:default";
+        btn.disabled = true;
+      } else {
+        btn.textContent = "+ Hinzufügen";
+        btn.style.cssText = "padding:5px 10px;border-radius:8px;background:rgba(0,200,255,.1);color:var(--cyan);border:1px solid rgba(0,200,255,.3);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap";
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = "…";
+          try {
+            await api("/rest/v1/rpc/add_member_to_group", {
+              method: "POST", json: true,
+              body: JSON.stringify({ conv_id: currentGroupConv.id, new_user_id: u.id })
+            });
+            btn.textContent = "✓ Hinzugefügt";
+            btn.style.color = "#22c55e";
+            btn.style.borderColor = "#22c55e";
+            btn.style.background = "rgba(34,197,94,.1)";
+            // Refresh members list
+            await openGroupInfo(currentGroupConv);
+            document.getElementById("add-member-search").value = "";
+            document.getElementById("add-member-results").innerHTML = "";
+          } catch(e) {
+            btn.disabled = false; btn.textContent = "+ Hinzufügen";
+            alert("Fehler: " + e.message);
+          }
+        };
+      }
+
+      div.appendChild(avatar);
+      div.appendChild(info);
+      div.appendChild(btn);
+      results.appendChild(div);
+    });
+  } catch(e) {
+    results.innerHTML = `<div style="font-size:13px;color:#ff4444;padding:6px 0">Fehler: ${e.message}</div>`;
+  }
 }
 
 async function leaveGroup() {
@@ -2308,11 +2475,24 @@ async function leaveGroup() {
         <div id="group-panel-name" style="font-weight:700;font-size:18px;color:var(--text)"></div>
         <div id="group-panel-count" style="font-size:13px;color:var(--sub);margin-top:4px;font-family:'Space Mono',monospace"></div>
       </div>
+      <!-- Add member section (admin only) -->
+      <div id="add-member-section" style="display:none;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">// Mitglied hinzufügen</p>
+        <div style="background:var(--surface2);border-radius:10px;padding:9px 14px;display:flex;align-items:center;gap:8px;border:1.5px solid var(--border);margin-bottom:8px">
+          <span style="color:var(--sub2)">🔍</span>
+          <input id="add-member-search" placeholder="Benutzername oder E-Mail…"
+            oninput="searchNewMember()"
+            autocapitalize="none"
+            style="border:none;background:transparent;outline:none;font-size:16px;flex:1;color:var(--text);font-family:'DM Sans',sans-serif"/>
+        </div>
+        <div id="add-member-results"></div>
+      </div>
+
       <div style="padding:16px">
         <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">// Mitglieder</p>
         <div id="group-members-list" style="display:flex;flex-direction:column;gap:6px"></div>
       </div>
-      <div style="padding:0 16px 24px">
+      <div style="padding:0 16px 24px;display:flex;flex-direction:column;gap:8px">
         <button onclick="leaveGroup()" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,68,68,.1);color:#ff4444;border:1px solid rgba(255,68,68,.3);font-weight:600;font-size:14px;cursor:pointer">🚪 Gruppe verlassen</button>
       </div>
     </div>
