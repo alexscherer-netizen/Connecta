@@ -284,6 +284,23 @@ body::before{
 .msg-text{font-size:14px;color:var(--text);line-height:1.55;display:block}
 .msg-meta{font-size:10px;color:var(--sub2);float:right;margin-left:8px;margin-top:4px;white-space:nowrap;font-family:'Space Mono',monospace}
 .tick{color:var(--cyan2);margin-left:2px}
+
+/* Typing indicator */
+.typing-indicator{display:none;align-items:center;gap:8px;padding:6px 0 2px}
+.typing-indicator.visible{display:flex}
+.typing-bubble{background:var(--surface);border:1px solid var(--border);border-radius:18px;border-top-left-radius:4px;padding:10px 14px;display:flex;align-items:center;gap:4px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.typing-dot{width:7px;height:7px;border-radius:50%;background:var(--sub);animation:typingBounce 1.2s infinite ease-in-out}
+.typing-dot:nth-child(1){animation-delay:0s}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+.typing-name{font-size:12px;color:var(--sub);font-family:'Space Mono',monospace}
+
+/* Unread badge */
+.unread-badge{min-width:20px;height:20px;border-radius:10px;background:linear-gradient(135deg,var(--cyan2),var(--accent));color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;font-family:'Space Mono',monospace}
+
+/* Online status dot */
+.status-dot{width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--surface);position:absolute;bottom:0;right:0}
 .msg-img{max-width:100%;max-height:260px;border-radius:12px;display:block;cursor:pointer;margin-bottom:6px}
 
 .img-preview-wrap{
@@ -491,19 +508,6 @@ body::before{
           <span style="color:var(--sub2);margin-left:auto">›</span>
         </div>
       </div>
-      <div style="padding:0 16px 8px">
-        <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">// Rechtliches</p>
-        <div class="settings-item" onclick="showLegal('impressum')">
-          <span class="settings-icon">📋</span>
-          <div><div class="settings-title">Impressum</div><div class="settings-sub">Angaben nach § 5 TMG</div></div>
-          <span style="color:var(--sub2);margin-left:auto">›</span>
-        </div>
-        <div class="settings-item" onclick="showLegal('dsgvo')">
-          <span class="settings-icon">🔒</span>
-          <div><div class="settings-title">Datenschutzerklärung</div><div class="settings-sub">DSGVO-konform</div></div>
-          <span style="color:var(--sub2);margin-left:auto">›</span>
-        </div>
-      </div>
       <div style="padding:16px;margin-top:auto;text-align:center">
         <p style="font-family:'Space Mono',monospace;font-size:11px;color:var(--sub2)">Connecta v1.0.0</p>
       </div>
@@ -564,6 +568,16 @@ body::before{
         </div>
       </div>
       <div id="messages"></div>
+      <!-- Typing indicator -->
+      <div class="typing-indicator" id="typing-indicator" style="padding:0 16px 4px">
+        <div class="typing-bubble">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+        <span class="typing-name" id="typing-name"></span>
+      </div>
+
       <div class="img-preview-wrap" id="img-preview-wrap">
         <img id="img-preview-thumb" src="" alt=""/>
         <span class="img-preview-name" id="img-preview-name"></span>
@@ -694,8 +708,18 @@ COLORS.forEach(c => {
 });
 
 const msgInput = document.getElementById("msg-input");
-msgInput.addEventListener("input",()=>{ msgInput.style.height="auto"; msgInput.style.height=Math.min(msgInput.scrollHeight,120)+"px"; });
-msgInput.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();} });
+msgInput.addEventListener("input",()=>{
+  msgInput.style.height="auto"; msgInput.style.height=Math.min(msgInput.scrollHeight,120)+"px";
+  // Typing indicator
+  if (activeConv) {
+    setTyping(true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => setTyping(false), 3000);
+  }
+});
+msgInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();setTyping(false);clearTimeout(typingTimeout);sendMessage();}
+});
 
 function setMode(mode) {
   currentMode=mode;
@@ -993,7 +1017,13 @@ async function loadConversations() {
       const otherId=participants?.find(p=>p.user_id!==session.user.id)?.user_id;
       let otherProfile=null;
       if (otherId) { const pa=await api("/rest/v1/profiles?id=eq."+otherId+"&select=*"); otherProfile=pa?.[0]||null; }
-      return {...conv,lastMsg,otherProfile};
+      // Get unread count
+      let unread=0;
+      try {
+        const ur=await api("/rest/v1/rpc/get_unread_count",{method:"POST",json:true,body:JSON.stringify({conv_id:conv.id,user_uid:session.user.id})});
+        unread=ur||0;
+      } catch(e){}
+      return {...conv,lastMsg,otherProfile,unread};
     }));
     renderConversations();
   } catch(e) { console.error("loadConversations:",e); }
@@ -1008,7 +1038,11 @@ function renderConversations() {
     const preview=conv.lastMsg ? (conv.lastMsg.image_url && !conv.lastMsg.content ? "📷 Bild" : `${isMe?"Du: ":""}${conv.lastMsg.content||""}`) : "Noch keine Nachrichten";
     const div=document.createElement("div");
     div.className="conv-item"+(activeConv?.id===conv.id?" active":"");
-    div.innerHTML=`<div class="avatar" style="width:48px;height:48px;font-size:17px;background:${conv.otherProfile?.avatar_color||"#00B8D9"};overflow:hidden;position:relative">${conv.otherProfile?.avatar_url?`<img src="${conv.otherProfile.avatar_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:inherit" onerror="this.style.display='none'"/>`:getInitials(conv.otherProfile?.display_name||"?")}</div><div class="conv-info"><div class="conv-top"><span class="conv-name">${escHtml(conv.otherProfile?.display_name||"Unbekannt")}</span><span class="conv-time">${formatTime(conv.lastMsg?.created_at||conv.updated_at)}</span></div><div class="conv-preview">${escHtml(preview)}</div></div>`;
+    const avatarInner = conv.otherProfile?.avatar_url
+      ? `<img src="${conv.otherProfile.avatar_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:inherit" onerror="this.style.display='none'"/>`
+      : getInitials(conv.otherProfile?.display_name||"?");
+    const unreadBadge = conv.unread > 0 ? `<span class="unread-badge">${conv.unread > 99 ? "99+" : conv.unread}</span>` : "";
+    div.innerHTML=`<div class="avatar" style="width:48px;height:48px;font-size:17px;background:${conv.otherProfile?.avatar_color||"#00B8D9"};overflow:hidden;position:relative">${avatarInner}</div><div class="conv-info"><div class="conv-top"><span class="conv-name" style="${conv.unread>0?'font-weight:700;color:var(--text)':''}">${escHtml(conv.otherProfile?.display_name||"Unbekannt")}</span><span style="display:flex;align-items:center;gap:6px">${unreadBadge}<span class="conv-time">${formatTime(conv.lastMsg?.created_at||conv.updated_at)}</span></span></div><div class="conv-preview" style="${conv.unread>0?'color:var(--text);font-weight:500':''}">${escHtml(preview)}</div></div>`;
     div.onclick=()=>openConversation(conv);
     list.appendChild(div);
   });
@@ -1029,6 +1063,9 @@ async function openConversation(conv) {
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conv.id}`},
       payload=>{appendMessage(payload.new);loadConversations();})
     .subscribe();
+  subscribeTyping(conv);
+  hideTypingIndicator();
+  markAsRead(conv.id);
   if (!isMobile()) msgInput.focus();
 }
 
@@ -1076,6 +1113,7 @@ async function sendMessage() {
   const content=msgInput.value.trim();
   if (!content&&!selectedImage) return;
   if (!activeConv) return;
+  setTyping(false); clearTimeout(typingTimeout);
   msgInput.value=""; msgInput.style.height="auto";
   const imgToSend=selectedImage; removeImage();
   try {
@@ -1309,6 +1347,130 @@ document.addEventListener("click", (e) => {
     picker.classList.remove("visible");
   }
 });
+
+// ── Legal ──
+function showLegal(type) {
+  const overlay = document.getElementById("legal-overlay");
+  const title = document.getElementById("legal-title");
+  const body = document.getElementById("legal-content");
+  overlay.style.display = "flex";
+  const today = new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+
+  if (type === "impressum") {
+    title.textContent = "// IMPRESSUM";
+    body.innerHTML =
+      '<p style="color:var(--sub);font-size:12px;font-family:Space Mono,monospace;margin-bottom:20px">Angaben gemäß § 5 TMG</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin-bottom:8px">BETREIBER</h4>' +
+      '<p>Alexander Scherer<br>Mertensstraße 18<br>13587 Berlin<br>Deutschland</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">KONTAKT</h4>' +
+      '<p>E-Mail: <a href="mailto:info@alexander-scherer.com" style="color:var(--cyan)">info@alexander-scherer.com</a></p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">HINWEIS ZUR PLATTFORM</h4>' +
+      '<p>Connecta ist ein privates, nicht-gewerbliches Projekt. Es findet keine kommerzielle Nutzung statt.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">HAFTUNG FÜR INHALTE</h4>' +
+      '<p>Als privater Betreiber bin ich gemäß § 7 Abs. 1 TMG für eigene Inhalte verantwortlich. Eine Haftung für Inhalte Dritter, die über diese Plattform übermittelt werden, wird ausgeschlossen.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">URHEBERRECHT</h4>' +
+      '<p>Die erstellten Inhalte unterliegen dem deutschen Urheberrecht. Vervielfältigung ohne Zustimmung ist untersagt.</p>' +
+      '<p style="color:var(--sub2);font-size:12px;font-family:Space Mono,monospace;margin-top:24px">Stand: ' + today + '</p>';
+  } else {
+    title.textContent = "// DATENSCHUTZ";
+    body.innerHTML =
+      '<p style="color:var(--sub);font-size:12px;font-family:Space Mono,monospace;margin-bottom:20px">Datenschutzerklärung gemäß DSGVO</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin-bottom:8px">1. VERANTWORTLICHER</h4>' +
+      '<p>Alexander Scherer, Mertensstraße 18, 13587 Berlin<br>E-Mail: <a href="mailto:info@alexander-scherer.com" style="color:var(--cyan)">info@alexander-scherer.com</a></p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">2. ERHOBENE DATEN</h4>' +
+      '<p>E-Mail-Adresse, Benutzername, Profilbild, Status, Nachrichten, Bilder, Zeitstempel, gespeicherte Kontakte.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">3. ZWECK & RECHTSGRUNDLAGE</h4>' +
+      '<p>Ausschließlich zum Betrieb der Messaging-Plattform. Rechtsgrundlage: Art. 6 Abs. 1 lit. b und a DSGVO.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">4. DATENSPEICHERUNG</h4>' +
+      '<p>Alle Daten werden bei <strong>Supabase Inc.</strong> auf EU-Servern (Frankfurt / Stockholm) gespeichert. Supabase ist nach dem EU-US Data Privacy Framework zertifiziert. Standardvertragsklauseln (SCCs) gemäß Art. 46 DSGVO sind vereinbart.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">5. SPEICHERDAUER</h4>' +
+      '<p>Daten werden gelöscht, sobald der Zweck entfällt oder Sie Ihr Konto löschen (Einstellungen → Account löschen).</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">6. WEITERGABE AN DRITTE</h4>' +
+      '<p>Keine Weitergabe personenbezogener Daten an Dritte. Ausnahme: gesetzliche Verpflichtung.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">7. IHRE RECHTE (ART. 15–22 DSGVO)</h4>' +
+      '<p><strong>Auskunft</strong> · <strong>Berichtigung</strong> · <strong>Löschung</strong> (über Einstellungen → Account löschen) · <strong>Einschränkung</strong> · <strong>Datenübertragbarkeit</strong> · <strong>Widerspruch</strong> · <strong>Widerruf</strong> der Einwilligung jederzeit möglich.</p>' +
+      '<p style="margin-top:8px">Kontakt: <a href="mailto:info@alexander-scherer.com" style="color:var(--cyan)">info@alexander-scherer.com</a></p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">8. BESCHWERDERECHT</h4>' +
+      '<p>Berliner Beauftragte für Datenschutz und Informationsfreiheit<br>Alt-Moabit 59–61, 10555 Berlin<br><a href="mailto:mailbox@datenschutz-berlin.de" style="color:var(--cyan)">mailbox@datenschutz-berlin.de</a></p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">9. DATENSICHERHEIT</h4>' +
+      '<p>TLS-Verschlüsselung aller Verbindungen. Passwörter als bcrypt-Hash. Datenbankzugriff durch Row Level Security (RLS) technisch abgesichert. Kein Tracking, keine Werbung.</p>' +
+      '<h4 style="font-family:Space Mono,monospace;color:var(--cyan);font-size:13px;margin:20px 0 8px">10. COOKIES & LOKALER SPEICHER</h4>' +
+      '<p>Keine Tracking-Cookies. localStorage wird ausschließlich zur Speicherung des Auth-Tokens verwendet (technisch notwendig).</p>' +
+      '<p style="color:var(--sub2);font-size:12px;font-family:Space Mono,monospace;margin-top:24px">Stand: ' + today + '</p>';
+  }
+}
+
+// ── Typing Indicator ──
+let typingTimeout = null;
+let typingChannel = null;
+let isTyping = false;
+
+async function setTyping(active) {
+  if (!session || !activeConv) return;
+  if (active === isTyping) return;
+  isTyping = active;
+  try {
+    if (active) {
+      await fetch(SUPABASE_URL + "/rest/v1/typing_indicators", {
+        method: "POST",
+        headers: { ...HJ(), "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({ conversation_id: activeConv.id, user_id: session.user.id, updated_at: new Date().toISOString() })
+      });
+    } else {
+      await fetch(SUPABASE_URL + "/rest/v1/typing_indicators?conversation_id=eq." + activeConv.id + "&user_id=eq." + session.user.id, {
+        method: "DELETE", headers: H()
+      });
+    }
+  } catch(e) {}
+}
+
+function showTypingIndicator(name) {
+  document.getElementById("typing-indicator").classList.add("visible");
+  document.getElementById("typing-name").textContent = name + " schreibt…";
+  document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+}
+
+function hideTypingIndicator() {
+  document.getElementById("typing-indicator").classList.remove("visible");
+  document.getElementById("typing-name").textContent = "";
+}
+
+function subscribeTyping(conv) {
+  if (typingChannel) sb.removeChannel(typingChannel);
+  typingChannel = sb.channel("typing-" + conv.id)
+    .on("postgres_changes", {
+      event: "*", schema: "public", table: "typing_indicators",
+      filter: "conversation_id=eq." + conv.id
+    }, async (payload) => {
+      // Someone else is typing
+      if (payload.new?.user_id === session?.user?.id) return;
+      if (payload.eventType === "DELETE" || !payload.new?.user_id) {
+        hideTypingIndicator();
+      } else {
+        // Get their name
+        const name = conv.otherProfile?.display_name || "Jemand";
+        showTypingIndicator(name);
+        // Auto-hide after 4s in case delete event is missed
+        clearTimeout(typingChannel._hideTimer);
+        typingChannel._hideTimer = setTimeout(hideTypingIndicator, 4000);
+      }
+    }).subscribe();
+}
+
+// ── Mark as read ──
+async function markAsRead(convId) {
+  if (!session || !convId) return;
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/conversation_participants?conversation_id=eq." + convId + "&user_id=eq." + session.user.id, {
+      method: "PATCH",
+      headers: { ...HJ(), "Prefer": "return=minimal" },
+      body: JSON.stringify({ last_read: new Date().toISOString() })
+    });
+    // Update unread locally to 0 immediately
+    const conv = conversations.find(c => c.id === convId);
+    if (conv) { conv.unread = 0; renderConversations(); }
+  } catch(e) {}
+}
 </script>
 <!-- EMOJI PICKER -->
 <div class="emoji-picker" id="emoji-picker">
