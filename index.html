@@ -607,6 +607,13 @@ body.light-mode body::before{background-image:linear-gradient(rgba(0,150,200,0.0
       <input class="auth-input" id="email" placeholder="E-Mail" type="email" autocomplete="email" inputmode="email"/>
       <input class="auth-input" id="password" placeholder="Passwort (min. 6 Zeichen)" type="password" autocomplete="current-password"/>
     </div>
+    <!-- Remember me (only shown on login) -->
+    <div id="remember-wrap" style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <div onclick="toggleRememberMe()" id="remember-toggle" style="width:44px;height:24px;border-radius:12px;background:var(--cyan2);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0">
+        <div id="remember-knob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:22px;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)"></div>
+      </div>
+      <span style="font-size:13px;color:var(--sub);cursor:pointer" onclick="toggleRememberMe()">Angemeldet bleiben</span>
+    </div>
     <p class="auth-msg" id="auth-msg"></p>
     <button class="auth-btn" id="auth-btn" onclick="handleAuth()">Anmelden</button>
   </div>
@@ -626,6 +633,7 @@ body.light-mode body::before{background-image:linear-gradient(rgba(0,150,200,0.0
       <div class="avatar" id="my-avatar" style="width:36px;height:36px;font-size:13px;cursor:pointer;flex-shrink:0" onclick="openProfileModal()" title="Profil bearbeiten"></div>
       <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Hell/Dunkel">🌙</button>
       <button class="icon-btn" onclick="openModal()" title="Neuer Chat">✏️</button>
+      <button class="icon-btn" onclick="confirmSignOut()" title="Abmelden" style="color:#ff6b6b">🚪</button>
     </div>
     <div class="search-bar">
       <div class="search-inner">
@@ -3100,6 +3108,67 @@ function renderContacts() {
     av.style.cursor = 'pointer';
     av.onclick = () => openProfileView(myContacts[i]);
   });
+}
+
+// ── Remember Me ──
+let rememberMe = true; // default ON
+
+function toggleRememberMe() {
+  rememberMe = !rememberMe;
+  const knob = document.getElementById('remember-knob');
+  const track = document.getElementById('remember-toggle');
+  if (rememberMe) {
+    knob.style.left = '22px';
+    track.style.background = 'var(--cyan2)';
+  } else {
+    knob.style.left = '2px';
+    track.style.background = 'var(--border2)';
+  }
+}
+
+// Hide remember-me on register tab, show on login
+const _origSetMode = setMode;
+function setMode(mode) {
+  _origSetMode(mode);
+  const wrap = document.getElementById('remember-wrap');
+  if (wrap) wrap.style.display = mode === 'login' ? 'flex' : 'none';
+}
+
+// ── Confirm Signout ──
+async function confirmSignOut() {
+  if (!confirm('Möchtest du dich wirklich abmelden?')) return;
+  await signOut();
+}
+
+// ── Patch handleAuth to respect rememberMe ──
+const _origHandleAuth = handleAuth;
+async function handleAuth() {
+  if (currentMode === 'login') {
+    // Set session storage based on remember me
+    if (!rememberMe) {
+      // Use in-memory session only (cleared on tab close)
+      supabase.createClient && sb.auth.updateUser && null; // no-op
+      // We'll handle this by destroying session on page unload if not remembered
+      sessionStorage.setItem('connecta_no_persist', '1');
+    } else {
+      sessionStorage.removeItem('connecta_no_persist');
+    }
+  }
+  await _origHandleAuth();
+}
+
+// If "no persist" was set, sign out when page closes
+window.addEventListener('beforeunload', () => {
+  if (sessionStorage.getItem('connecta_no_persist') === '1') {
+    sb.auth.signOut();
+  }
+});
+
+// On load, check if we should restore session
+// (Supabase handles persistence via localStorage by default)
+// If no_persist was set and we're reloading, sign out
+if (sessionStorage.getItem('connecta_no_persist') === '1') {
+  sb.auth.signOut().then(() => sessionStorage.removeItem('connecta_no_persist'));
 }
 </script>
 <!-- EMOJI PICKER -->
