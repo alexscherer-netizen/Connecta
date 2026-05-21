@@ -1582,6 +1582,7 @@ function openProfileModal() {
   if (!myProfile) return;
   profileColor=myProfile.avatar_color||"#00B8D9";
   selectedAvatarFile=null;
+  selectedFont=myProfile.font_family||"DM Sans";
   document.getElementById("profile-displayname").value=myProfile.display_name||"";
   document.getElementById("profile-status").value=myProfile.status||"";
   document.getElementById("profile-msg").textContent="";
@@ -1600,6 +1601,10 @@ function openProfileModal() {
   }
   profileColorRow.querySelectorAll(".color-dot").forEach(b=>b.classList.toggle("selected",rgbToHex(b.style.background)===profileColor));
   document.getElementById("profile-overlay").classList.add("visible");
+  // Reset and init font picker
+  const picker = document.getElementById("font-picker");
+  if (picker) { picker.innerHTML=""; }
+  setTimeout(initFontPicker, 50);
 }
 
 function handleAvatarSelect(e) {
@@ -1641,7 +1646,7 @@ async function saveProfile() {
       if (!upRes.ok) throw new Error("Bild-Upload: "+await upRes.text());
       avatar_url=SUPABASE_URL+"/storage/v1/object/public/avatars/"+path+"?t="+Date.now();
     }
-    const body={display_name:displayName,avatar_color:profileColor,status};
+    const body={display_name:displayName,avatar_color:profileColor,status,font_family:selectedFont||"DM Sans"};
     if (avatar_url !== undefined) body.avatar_url=avatar_url;
     const res=await fetch(SUPABASE_URL+"/rest/v1/profiles?id=eq."+session.user.id,{
       method:"PATCH",headers:{...HJ(),"Prefer":"return=representation"},
@@ -3002,33 +3007,7 @@ function initFontPicker() {
   });
 }
 
-// Override openProfileModal to init font picker
-const _origOpenProfileModal = openProfileModal;
-function openProfileModal() {
-  _origOpenProfileModal();
-  setTimeout(initFontPicker, 50);
-}
-
-// Override saveProfile to also save font
-const _origSaveProfile = saveProfile;
-async function saveProfile() {
-  // Patch font into body before save
-  const origBody = JSON.stringify;
-  const fontToSave = selectedFont || 'DM Sans';
-  // We intercept the fetch by temporarily patching font
-  const prevFont = myProfile?.font_family;
-  if (myProfile) myProfile.font_family = fontToSave;
-  await _origSaveProfile();
-  // Also patch font separately if needed
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + session.user.id, {
-      method: 'PATCH',
-      headers: { ...HJ(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ font_family: fontToSave })
-    });
-    if (myProfile) myProfile.font_family = fontToSave;
-  } catch(e) {}
-}
+// Font picker is initialized inside openProfileModal directly
 
 // ── Profile View ──
 async function openProfileView(profile) {
