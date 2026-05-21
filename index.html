@@ -669,6 +669,11 @@ body.light-mode body::before{background-image:linear-gradient(rgba(0,150,200,0.0
           <div><div class="settings-title">Chat-Hintergrund</div><div class="settings-sub">Hintergrundbild wählen</div></div>
           <span style="color:var(--sub2);margin-left:auto">›</span>
         </div>
+        <div class="settings-item" id="notif-settings-item" onclick="requestNotifFromUser()">
+          <span class="settings-icon">🔔</span>
+          <div><div class="settings-title">Benachrichtigungen</div><div class="settings-sub" id="notif-status-text">Tippe zum Aktivieren</div></div>
+          <span id="notif-status-icon" style="margin-left:auto;font-size:18px">🔕</span>
+        </div>
         <div class="settings-item" onclick="signOut()">
           <span class="settings-icon">🚪</span>
           <div><div class="settings-title">Abmelden</div><div class="settings-sub">Von diesem Gerät abmelden</div></div>
@@ -1043,6 +1048,7 @@ function switchTab(tab) {
   document.getElementById('nav-contacts').classList.toggle('active', tab==='contacts');
   document.getElementById('nav-settings').classList.toggle('active', tab==='settings');
   if (tab==='contacts') loadContacts();
+  if (tab==='settings') updateNotifSettingsUI();
 }
 
 // ── Chat search ──
@@ -1241,7 +1247,15 @@ async function startChatWithContact(contactId) {
   } catch(e) { alert("Fehler: "+e.message); }
 }
 
-sb.auth.getSession().then(({data})=>{ if(data?.session) initSession(data.session); });
+sb.auth.getSession().then(async ({data})=>{
+  // If user chose not to stay logged in, sign out on reload
+  if (sessionStorage.getItem('connecta_no_persist') === '1') {
+    sessionStorage.removeItem('connecta_no_persist');
+    await sb.auth.signOut();
+    return;
+  }
+  if (data?.session) initSession(data.session);
+});
 sb.auth.onAuthStateChange((event,sess)=>initSession(sess));
 async function signOut() { await sb.auth.signOut(); activeConv=null; conversations=[]; goBack(); renderConversations(); }
 
@@ -2017,11 +2031,54 @@ async function adminToggleAdmin(userId, makeAdmin, name) {
 }
 
 // ── Browser Notifications ──
-async function requestNotificationPermission() {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "default") {
-    await Notification.requestPermission();
+function updateNotifSettingsUI() {
+  const statusText = document.getElementById('notif-status-text');
+  const statusIcon = document.getElementById('notif-status-icon');
+  if (!statusText || !statusIcon) return;
+  if (!("Notification" in window)) {
+    statusText.textContent = "Nicht unterstützt (nur HTTPS)";
+    statusIcon.textContent = "❌";
+    return;
   }
+  if (Notification.permission === "granted") {
+    statusText.textContent = "Aktiviert ✓";
+    statusIcon.textContent = "🔔";
+    statusIcon.style.color = "var(--cyan)";
+  } else if (Notification.permission === "denied") {
+    statusText.textContent = "Blockiert – in Browser-Einstellungen erlauben";
+    statusIcon.textContent = "🚫";
+    statusIcon.style.color = "#ff4444";
+  } else {
+    statusText.textContent = "Tippe zum Aktivieren";
+    statusIcon.textContent = "🔕";
+    statusIcon.style.color = "";
+  }
+}
+
+async function requestNotifFromUser() {
+  if (!("Notification" in window)) {
+    alert("Benachrichtigungen werden nur auf HTTPS-Seiten unterstützt.\nBitte die App über GitHub Pages oder Netlify öffnen.");
+    return;
+  }
+  if (Notification.permission === "granted") {
+    alert("Benachrichtigungen sind bereits aktiviert! ✓");
+    return;
+  }
+  if (Notification.permission === "denied") {
+    alert("Benachrichtigungen wurden blockiert.\n\nSo freischalten:\n• Chrome/Edge: Schloss-Icon in Adressleiste → Benachrichtigungen → Erlauben\n• Firefox: Schild-Icon → Erlauben\n• Safari: Einstellungen → Websites → Benachrichtigungen");
+    return;
+  }
+  const result = await Notification.requestPermission();
+  updateNotifSettingsUI();
+  if (result === "granted") {
+    // Test notification
+    new Notification("Connecta", { body: "Benachrichtigungen sind aktiviert! 🎉", icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300B8D9'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" });
+  }
+}
+
+async function requestNotificationPermission() {
+  // Called on login - just update UI, don't auto-request (browsers block it)
+  updateNotifSettingsUI();
 }
 
 function showPushNotification(msg) {
@@ -3151,12 +3208,7 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-// On load, check if we should restore session
-// (Supabase handles persistence via localStorage by default)
-// If no_persist was set and we're reloading, sign out
-if (sessionStorage.getItem('connecta_no_persist') === '1') {
-  sb.auth.signOut().then(() => sessionStorage.removeItem('connecta_no_persist'));
-}
+
 </script>
 <!-- EMOJI PICKER -->
 <div class="emoji-picker" id="emoji-picker">
