@@ -964,6 +964,8 @@ function setMode(mode) {
   document.getElementById("reg-fields").style.display=mode==="register"?"flex":"none";
   document.getElementById("auth-btn").textContent=mode==="login"?"Anmelden":"Konto erstellen";
   document.getElementById("auth-msg").textContent="";
+  const wrap=document.getElementById("remember-wrap");
+  if (wrap) wrap.style.display=mode==="login"?"flex":"none";
 }
 
 async function handleAuth() {
@@ -977,6 +979,12 @@ async function handleAuth() {
     if (currentMode==="login") {
       const {error}=await sb.auth.signInWithPassword({email,password});
       if (error) throw error;
+      // Handle remember me
+      if (!rememberMe) {
+        sessionStorage.setItem('connecta_no_persist','1');
+      } else {
+        sessionStorage.removeItem('connecta_no_persist');
+      }
     } else {
       const un=document.getElementById("username").value.trim();
       if (!un||!email||!password) throw new Error("Bitte alle Felder ausfüllen.");
@@ -3126,13 +3134,7 @@ function toggleRememberMe() {
   }
 }
 
-// Hide remember-me on register tab, show on login
-const _origSetMode = setMode;
-function setMode(mode) {
-  _origSetMode(mode);
-  const wrap = document.getElementById('remember-wrap');
-  if (wrap) wrap.style.display = mode === 'login' ? 'flex' : 'none';
-}
+// setMode remember-me handled inside original setMode
 
 // ── Confirm Signout ──
 async function confirmSignOut() {
@@ -3140,22 +3142,7 @@ async function confirmSignOut() {
   await signOut();
 }
 
-// ── Patch handleAuth to respect rememberMe ──
-const _origHandleAuth = handleAuth;
-async function handleAuth() {
-  if (currentMode === 'login') {
-    // Set session storage based on remember me
-    if (!rememberMe) {
-      // Use in-memory session only (cleared on tab close)
-      supabase.createClient && sb.auth.updateUser && null; // no-op
-      // We'll handle this by destroying session on page unload if not remembered
-      sessionStorage.setItem('connecta_no_persist', '1');
-    } else {
-      sessionStorage.removeItem('connecta_no_persist');
-    }
-  }
-  await _origHandleAuth();
-}
+// rememberMe is handled inside handleAuth directly
 
 // If "no persist" was set, sign out when page closes
 window.addEventListener('beforeunload', () => {
