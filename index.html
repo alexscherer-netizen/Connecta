@@ -1124,8 +1124,10 @@ function renderContacts() {
   myContacts.forEach(c => {
     const div = document.createElement("div");
     div.className="contact-item";
+    // Click on avatar opens profile view
+    const avatarClickable = `onclick="openProfileView(myContacts[${myContacts.indexOf(c)}])" style="cursor:pointer"`;
     div.innerHTML=`
-      <div class="avatar" style="width:44px;height:44px;font-size:16px;background:${c.avatar_color||"#00B8D9"}">${getInitials(c.display_name)}</div>
+      <div class="avatar" ${avatarClickable} style="width:44px;height:44px;font-size:16px;background:${c.avatar_color||"#00B8D9"}">${getInitials(c.display_name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:14px;color:var(--text)">${escHtml(c.display_name)}</div>
         <div style="font-size:12px;color:var(--sub);font-family:'Space Mono',monospace">@${escHtml(c.username)}</div>
@@ -3165,15 +3167,7 @@ async function openProfileView(profile) {
 }
 
 // Make avatars clickable in conversation list & contacts
-const _origRenderContacts = renderContacts;
-function renderContacts() {
-  _origRenderContacts();
-  // Add click handler to avatars in contacts list
-  document.querySelectorAll('#contacts-list .avatar').forEach((av, i) => {
-    av.style.cursor = 'pointer';
-    av.onclick = () => openProfileView(myContacts[i]);
-  });
-}
+// renderContacts profile view handled inside original renderContacts
 
 // ── Remember Me ──
 let rememberMe = true; // default ON
