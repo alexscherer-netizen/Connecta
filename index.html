@@ -6,6 +6,28 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>Connecta</title>
+<script>
+// ── Service Worker ──
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    window._swReg = reg;
+    // If already active, use it directly
+    if (reg.active) window._swReg = reg;
+    // Wait for SW to become active
+    reg.addEventListener('updatefound', () => {
+      reg.installing?.addEventListener('statechange', () => {
+        if (reg.installing?.state === 'activated') window._swReg = reg;
+      });
+    });
+    console.log('SW registered');
+  } catch(e) {
+    console.warn('SW registration failed:', e.message);
+  }
+}
+registerServiceWorker();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=Roboto:wght@300;400;500;700&family=Playfair+Display:wght@400;600;700&family=Courier+Prime:wght@400;700&family=Nunito:wght@400;600;700&family=Merriweather:wght@300;400;700&family=Dancing+Script:wght@400;600;700&family=Oswald:wght@400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -984,9 +1006,16 @@ async function handleAuth() {
     if (currentMode==="login") {
       const {error}=await sb.auth.signInWithPassword({email,password});
       if (error) throw error;
-      // Handle remember me
+      // Handle remember me - if OFF, sign out when tab closes
       if (!rememberMe) {
         sessionStorage.setItem('connecta_no_persist','1');
+        // Listen for tab close (pagehide with persisted=false = real close)
+        window.addEventListener('pagehide', (e) => {
+          if (!e.persisted && sessionStorage.getItem('connecta_no_persist') === '1') {
+            // Tab is closing - clear the session from localStorage
+            try { localStorage.removeItem('sb-ugitunttmvswyxmyhnjb-auth-token'); } catch(err) {}
+          }
+        }, { once: true });
       } else {
         sessionStorage.removeItem('connecta_no_persist');
       }
@@ -1249,16 +1278,20 @@ async function startChatWithContact(contactId) {
   } catch(e) { alert("Fehler: "+e.message); }
 }
 
-sb.auth.getSession().then(async ({data})=>{
-  // If user chose not to stay logged in, sign out on reload
-  if (sessionStorage.getItem('connecta_no_persist') === '1') {
-    sessionStorage.removeItem('connecta_no_persist');
-    await sb.auth.signOut();
+// Restore session on load
+sb.auth.getSession().then(async ({data}) => {
+  if (data?.session) {
+    initSession(data.session);
+  }
+});
+sb.auth.onAuthStateChange((event, sess) => {
+  // SIGNED_OUT: clear everything
+  if (event === 'SIGNED_OUT') {
+    initSession(null);
     return;
   }
-  if (data?.session) initSession(data.session);
+  if (sess) initSession(sess);
 });
-sb.auth.onAuthStateChange((event,sess)=>initSession(sess));
 async function signOut() { await sb.auth.signOut(); activeConv=null; conversations=[]; goBack(); renderConversations(); }
 
 function showChatOnMobile() { if(!isMobile())return; document.getElementById("sidebar").classList.add("hidden"); document.getElementById("chat-area").classList.add("active"); }
@@ -2058,24 +2091,89 @@ function updateNotifSettingsUI() {
 }
 
 async function requestNotifFromUser() {
-  if (!("Notification" in window)) {
-    alert("Benachrichtigungen werden nur auf HTTPS-Seiten unterstützt.\nBitte die App über GitHub Pages oder Netlify öffnen.");
+  const isHttps = location.protocol === "https:" || location.hostname === "localhost";
+  const hasApi = "Notification" in window;
+  const isIosSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+  const isSamsungBrowser = /SamsungBrowser/.test(navigator.userAgent);
+
+  // iOS Safari: Notifications only work when installed as PWA
+  if (isIosSafari) {
+    const isStandalone = window.navigator.standalone === true;
+    if (!isStandalone) {
+      showNotifInfo("📱 iPhone/iPad Hinweis",
+        "Safari unterstützt Benachrichtigungen nur wenn Connecta als App installiert ist.\n\n" +
+        "So installieren:\n" +
+        "1. Tippe auf das Teilen-Symbol (□↑) unten\n" +
+        "2. Wähle \"Zum Home-Bildschirm\"\n" +
+        "3. Öffne Connecta vom Home-Bildschirm\n" +
+        "4. Dann erneut versuchen");
+      return;
+    }
+  }
+
+  if (!hasApi) {
+    let msg = "Dein Browser unterstützt keine Benachrichtigungen.\n\n";
+    if (!isHttps) {
+      msg += "Die App läuft lokal (file://) – bitte über GitHub Pages oder Netlify öffnen.";
+    } else if (isSamsungBrowser) {
+      msg += "Samsung Internet unterstützt Web-Benachrichtigungen eingeschränkt.\nVersuche Chrome oder Firefox.";
+    } else {
+      msg += "Versuche Chrome, Firefox oder Edge auf dem Desktop.";
+    }
+    showNotifInfo("❌ Nicht unterstützt", msg);
     return;
   }
+
+  if (!isHttps) {
+    showNotifInfo("⚠️ Kein HTTPS",
+      "Die App läuft lokal (file://).\n\n" +
+      "Benachrichtigungen funktionieren nur über HTTPS.\n" +
+      "Bitte die App über GitHub Pages öffnen.");
+    return;
+  }
+
   if (Notification.permission === "granted") {
-    alert("Benachrichtigungen sind bereits aktiviert! ✓");
+    showNotifInfo("✅ Bereits aktiviert", "Benachrichtigungen sind aktiv!");
     return;
   }
+
   if (Notification.permission === "denied") {
-    alert("Benachrichtigungen wurden blockiert.\n\nSo freischalten:\n• Chrome/Edge: Schloss-Icon in Adressleiste → Benachrichtigungen → Erlauben\n• Firefox: Schild-Icon → Erlauben\n• Safari: Einstellungen → Websites → Benachrichtigungen");
+    showNotifInfo("🚫 Blockiert",
+      "Benachrichtigungen wurden blockiert.\n\nSo freischalten:\n" +
+      "• Chrome/Edge: Schloss-Icon in Adressleiste → Benachrichtigungen → Erlauben\n" +
+      "• Firefox: Schild-Icon links in Adressleiste → Erlauben\n" +
+      "• Samsung: Einstellungen → Erweitert → Websiteeinstellungen → Benachrichtigungen\n" +
+      "• Safari Mac: Einstellungen → Websites → Benachrichtigungen");
     return;
   }
+
+  // Request permission
   const result = await Notification.requestPermission();
   updateNotifSettingsUI();
   if (result === "granted") {
-    // Test notification
-    new Notification("Connecta", { body: "Benachrichtigungen sind aktiviert! 🎉", icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300B8D9'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" });
+    new Notification("Connecta", {
+      body: "Benachrichtigungen aktiviert! ⚡",
+      icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300B8D9'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E"
+    });
+  } else if (result === "denied") {
+    updateNotifSettingsUI();
   }
+}
+
+function showNotifInfo(title, msg) {
+  // Nice modal instead of ugly alert
+  const existing = document.getElementById('notif-info-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'notif-info-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:20px';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:20px;padding:24px;width:100%;max-width:360px;border:1px solid var(--border);box-shadow:var(--shadow-lg)">
+      <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:16px;color:var(--cyan);margin-bottom:10px">${title}</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7;white-space:pre-line">${msg}</div>
+      <button onclick="document.getElementById('notif-info-modal').remove()" style="width:100%;margin-top:18px;padding:12px;border-radius:12px;background:linear-gradient(135deg,var(--cyan2),var(--accent));color:#fff;font-weight:700;font-size:14px;border:none;cursor:pointer">OK</button>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 async function requestNotificationPermission() {
@@ -2084,33 +2182,15 @@ async function requestNotificationPermission() {
 }
 
 function showPushNotification(msg) {
-  if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
   if (!document.hidden && activeConv?.id === msg.conversation_id) return;
-
-  // Find sender name
   const conv = conversations.find(c => c.id === msg.conversation_id);
-  const senderName = conv?.otherProfile?.display_name || "Jemand";
-  const body = msg.image_url && !msg.content ? "📷 Bild gesendet" : (msg.content || "Neue Nachricht");
-
-  const notif = new Notification("Connecta – " + senderName, {
-    body: body,
-    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300B8D9'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E",
-    badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300B8D9'/%3E%3C/svg%3E",
-    tag: msg.conversation_id,
-    renotify: true,
-    silent: false
-  });
-
-  notif.onclick = () => {
-    window.focus();
-    const conv = conversations.find(c => c.id === msg.conversation_id);
-    if (conv) { switchTab('chats'); openConversation(conv); }
-    notif.close();
-  };
-
-  // Auto close after 5s
-  setTimeout(() => notif.close(), 5000);
+  const senderName = conv?.otherProfile?.display_name || conv?.group_name || "Jemand";
+  const body = msg.image_url && !msg.content ? "📷 Bild gesendet"
+    : msg.voice_url ? "🎙️ Sprachnachricht"
+    : (msg.content || "Neue Nachricht");
+  // Use Service Worker for background notifications (works with screen off)
+  sendNotificationViaSW("Connecta – " + senderName, body, msg.conversation_id);
 }
 
 // Request permission on page visibility change (after user interaction)
@@ -3195,12 +3275,33 @@ async function confirmSignOut() {
 
 // rememberMe is handled inside handleAuth directly
 
-// If "no persist" was set, sign out when page closes
-window.addEventListener('beforeunload', () => {
-  if (sessionStorage.getItem('connecta_no_persist') === '1') {
-    sb.auth.signOut();
+
+
+
+
+// ── SW-based Push Notification (works with screen off) ──
+function sendNotificationViaSW(title, body, tag) {
+  const icon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2300B8D9'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E";
+
+  // Try Service Worker first (works with screen off)
+  if (window._swReg?.active) {
+    window._swReg.active.postMessage({
+      type: 'SHOW_NOTIFICATION',
+      title,
+      body,
+      tag,
+      icon
+    });
+    return;
   }
-});
+
+  // Fallback to regular Notification API
+  if (Notification.permission === 'granted') {
+    try {
+      new Notification(title, { body, tag, icon, renotify: true });
+    } catch(e) {}
+  }
+}
 
 
 </script>
