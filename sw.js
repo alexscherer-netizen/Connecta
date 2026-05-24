@@ -1,22 +1,33 @@
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
 
+// Handle messages from main app (tab active)
 self.addEventListener('message', e => {
   if (e.data?.type === 'SHOW_NOTIFICATION') {
     const { title, body, tag, icon } = e.data;
     e.waitUntil(
       self.registration.showNotification(title, {
-        body,
-        tag: tag || 'connecta',
-        icon: icon || './favicon.ico',
-        badge: icon || './favicon.ico',
-        vibrate: [200, 100, 200],
-        renotify: true,
-        requireInteraction: false,
-        data: e.data
+        body, tag: tag || 'connecta', icon: icon || './favicon.ico',
+        vibrate: [200, 100, 200], renotify: true
       })
     );
   }
+});
+
+// Handle server push (screen off / tab closed)
+self.addEventListener('push', e => {
+  let data = { title: 'Connecta', body: 'Neue Nachricht', tag: 'connecta' };
+  try { data = e.data.json(); } catch(err) {}
+  e.waitUntil(
+    self.registration.showNotification(data.title || 'Connecta', {
+      body: data.body || 'Neue Nachricht',
+      tag: data.tag || 'connecta',
+      icon: './favicon.ico',
+      vibrate: [200, 100, 200],
+      renotify: true,
+      badge: './favicon.ico'
+    })
+  );
 });
 
 self.addEventListener('notificationclick', e => {
